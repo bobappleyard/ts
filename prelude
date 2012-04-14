@@ -1,0 +1,90 @@
+// Standard Library
+
+// Printf-like function.
+def printf(pat, xs*)
+	print(pat.subst.apply(xs));
+end;
+
+// Collects functions to multiplex calls over.
+class Event()
+	def create()
+		this.handlers = [];
+	end;
+	// Add a handler: this is a function that will get called whenever the 
+	// event is called.
+	def add(h)
+		this.handlers.add(h);
+	end;
+	// Remove a handler.
+	def remove(h)
+		this.handlers.remove(h);
+	end;
+	// Allows the event object to have a function call interface.
+	def __call__(args*)
+		this.handlers.each(fn(i, h) = h.apply(args));
+	end;
+private
+	def handlers;
+end;
+
+// Schedule some code to run whether an error happened or not.
+def finally(thk, clearup)
+	def e = catch(thk);
+	def f = catch(clearup);
+	if e then
+		throw(e);
+	end;
+	if f then
+		throw(f);
+	end;
+end;
+
+// Register a function to be called if an error is raised during the execution
+// of a thunk.
+def split(thk, h)
+	def res;
+	def e = catch(fn()
+		res = thk();
+	end);
+	if e then
+		return h(e);
+	end;
+	return res;
+end;
+
+// Call a function with an escape (one-shot) continuation.
+//
+// Calls f, and whatever it returns is returned by callWithCont(). f takes a
+// single parameter, a continuation object.
+//
+// The continuation object is a function that takes a single argument. When
+// called, it causes callWithCont() to return the value of that argument.
+//
+// This is somewhat like call/cc in Scheme. However, unlike Scheme's
+// continuations, these continuations are not valid after callWithCont()
+// returns.
+def callWithCont(f)
+	def key = new Object(),
+	    followed = false,
+	    res;
+	def e = catch(fn()
+		res = f(fn(x)
+			if followed then
+				throw("stale continuation");
+			end;
+			throw([key, x]);
+		end);
+	end);
+	followed = true;
+	// normal return
+	if !e then
+		return res;
+	end;
+	// followed continuation
+	if e.is(Array) && e.size() == 2 && e[0] == key then
+		return e[1];
+	end;
+	// error
+	throw(e);
+end;
+

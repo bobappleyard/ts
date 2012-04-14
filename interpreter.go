@@ -11,7 +11,7 @@ import (
 	. "github.com/bobappleyard/ts/bytecode"
 )
 
-const tsRoot = "/usr/local/go/src/github.com/bobappleyard/ts"
+const tsRoot = "/usr/local/go/src/pkg/github.com/bobappleyard/ts"
 
 func root() string {
 	res := os.Getenv("TSROOT")
