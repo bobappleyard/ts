@@ -1,0 +1,83 @@
+TranScript SDK
+==============
+
+TranScript is a dynamically-typed object-oriented language that is designed with
+ease of use, flexibility and efficiency in mind. Efforts have been made so that
+extending programs written in Go with TranScript is very straightforward.
+
+Features:
+
+	- Support for functional, imperative, object-oriented approaches.
+	- Good concurrency support.
+	- Fast dynamic object system.
+	- Algol-derived syntax.
+	- Dynamically typed.
+	- Functions are first-class values with lexical scope.
+	- Tail call optimisation.
+	- Support for meta-weirdness with __callFailed__() etc.
+	- API makes it straightforward to extend Go programs with scripting 
+	  capabilities.
+
+Like most dynamic languages, TranScript is primarily influenced by Smalltalk and 
+Lisp (in particular Scheme). TranScript is object-oriented. Everything in 
+TranScript is an object. Objects are instances of classes. Classes describe
+objects. Classes are themselves (immutable) objects.
+
+Install
+-------
+
+	 go get github.com/bobappleyard/ts...
+
+Installs the TranScript SDK. You may need to be root to do this.
+
+Components:
+	- Framework for compiling and interpreting TranScript code (ts)
+	- Simple parser framework (ts/parse)
+	- Bytecode specification (ts/bytecode)
+	- Extensions to the language (ts/ext...)
+
+Use
+---
+
+Below is an example interpreter.
+
+	package main
+
+	import "github.com/bobappleyard/ts"
+
+	func main() {
+		i := ts.New()
+		i.Repl()
+	}
+
+A more feature-rich interpreter is available from:
+
+	http://bobappleyard.github.com/ts/install.html
+
+Read more
+---------
+
+Running godoc will give you a run-down of the functions, types etc defined by
+the distribution. Peruse the doc directory for information on programming in
+Transcript, extending the language and embedding the language into your
+programs.
+
+Version History
+---------------
+
+0.4 -- reflection API, properties, varargs
+0.3 -- packages, inner classes, anonymous classes  
+0.2 -- local variables, private & protected members  
+0.1 -- basic model
+
+
+
+
+
+
+
+
+
+
+
+

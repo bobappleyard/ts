@@ -1,0 +1,20 @@
+Language extensions
+===================
+
+Many (right now all) of these won't export anything to Go, and should be
+included using "_".
+
+e.g.
+
+	import _ "github.com/bobappleyard/ts/ext"
+
+That package there is actually a package that includes all the extensions. If
+you want to control which packages are available to the runtime, use the same
+method but on individual extensions.
+
+e.g.
+
+	import _ "github.com/bobappleyard/ts/ext/web"
+
+This only uses the web extension to the language.
+

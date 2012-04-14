@@ -1,0 +1,9 @@
+A simple parser library
+=======================
+
+Includes:
+
+* a way of building lexers after Pike's state function concept
+
+* a Pratt operator precedence parser
+ 
