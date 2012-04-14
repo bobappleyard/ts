@@ -10,13 +10,13 @@ Features:
 	- Support for functional, imperative, object-oriented approaches.
 	- Good concurrency support.
 	- Fast dynamic object system.
-	- Algol-derived syntax.
-	- Dynamically typed.
-	- Functions are first-class values with lexical scope.
-	- Tail call optimisation.
-	- Support for meta-weirdness with __callFailed__() etc.
 	- API makes it straightforward to extend Go programs with scripting 
 	  capabilities.
+	- Functions are first-class values with lexical scope.
+	- Algol-derived syntax.
+	- Dynamically typed.
+	- Tail call optimisation.
+	- Support for meta-weirdness with __callFailed__() etc.
 
 Like most dynamic languages, TranScript is primarily influenced by Smalltalk and 
 Lisp (in particular Scheme). TranScript is object-oriented. Everything in 
