@@ -1,0 +1,52 @@
+package cli
+	export printColor;
+	
+	def fcolors = {
+		"black": "30",
+		"red": "31",
+		"green": "32",
+		"brown": "33",
+		"blue": "34",
+		"purple": "35",
+		"cyan": "36",
+		"white": "37",
+		"BLACK": "1;30",
+		"RED": "1;31",
+		"GREEN": "1;32",
+		"BROWN": "1;33",
+		"BLUE": "1;34",
+		"PURPLE": "1;35",
+		"CYAN": "1;36",
+		"WHITE": "1;37"
+	};
+	
+	def bcolors = {
+		"black": "40",
+		"red": "41",
+		"green": "42",
+		"brown": "43",
+		"blue": "44",
+		"purple": "45",
+		"cyan": "46",
+		"white": "47"
+	};
+
+	def printColor(f, b, args*)
+		def fc, bc;
+		if f then
+			fc = fcolors[f];		
+		else
+			fc = fcolors["white"];
+		end;
+		if b then
+			bc = bcolors[b];
+		else
+			bc = bcolors["black"];
+		end;
+		if !fc || !bc then
+			throw("invalid color combination: % %".subst(f, b));
+		end;
+		print("\033[%m\033[%m%\033[0m".subst(fc, bc, args.join(" ")));
+	end;
+	
+end;

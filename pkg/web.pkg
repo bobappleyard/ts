@@ -1,0 +1,7 @@
+package web
+	export serve;
+
+	def w = packages["@web"];
+	def serve = w.serve;
+	
+end;

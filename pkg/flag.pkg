@@ -1,0 +1,55 @@
+package flag
+	import system;
+	export parse, printUsage, Spec;
+	
+	class Spec()
+		def args;
+	end;
+	
+	def printUsage = fn(spec)
+		spec.type.names("").each(fn(i, x)
+			def s = new Accessor(x).get(spec);
+			print("-%: %".subst(x, s[1]));
+		end);
+		print("-help: display this help");
+	end;
+	
+	def fail(spec)
+		printUsage(spec);
+		exit(2);
+	end;
+
+	def parse(spec)
+		def res = spec.copy(), inOpts = true;
+		res.type.names("").each(fn(i, x)
+			new Accessor(x).set(res, false);
+		end);
+		def step(i)
+			if i < system.args.size && system.args[i].startsWith("-") then
+				def opt = system.args[i].split();
+				if opt.size == 1 then
+					print("malformed option");
+					fail(spec);
+				end;
+				def a = new Accessor(opt.slice(1).join());
+				if a.name() == "help" then
+					fail(spec);
+				end;
+				if !a.defined(spec) then
+					print("unknown option: -" + a.name());
+					fail(spec);				
+				end;
+				if a.get(spec)[0] then
+					a.set(res, args[i+1]);
+					return step(i+2);
+				end;
+				a.set(res, true);
+				return step(i+1);
+			else
+				res.args = system.args.slice(i);
+			end;
+		end;
+		step(1);
+		return res;
+	end;
+end;

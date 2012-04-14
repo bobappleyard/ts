@@ -1,0 +1,111 @@
+package test
+	import flag;
+	export assert, str, errors, safe,
+	       pass, fail,
+	       add, run;
+
+	// add a suite of tests
+	def add(name, f)
+		suites.add([name, f]);
+	end;
+	
+	// run all the test suites and report how they went
+	def run()
+		def opts = flag.parse(new class(flag.Spec)
+			def v = [false, "verbose output"];
+		end); 
+		suites.each(fn(i, x) = runSuite.apply(x));
+		if msgs.size == 0 then
+			printPass(opts);
+		else
+			printFail(opts);
+		end;
+	end;
+	
+	def taken = 0, passed = 0, failed = 0;
+	def suites = [], msgs = [];
+	def name = "", cur = 0;
+	
+	// run an individual test
+	def assert(cnd)
+		if cnd then
+			pass();
+		else
+			fail();
+		end;
+	end;
+	
+	// run a test, convert it to a string and test that it equals s
+	def str(x, s)
+		assert(x.toString() == s);
+	end;
+	
+	// run a test, pass if it throws an error
+	def errors(thk)
+		assert(catch(thk));
+	end;
+	
+	// run a test, fail if it throws an error
+	def safe(thk)
+		assert(!catch(thk));
+	end;
+	
+	// eval a string, test if its output equals another string
+	def eval(expr, res)
+		str(eval(expr), res);
+	end;
+	
+	// pass a test
+	def pass()
+		cur = cur + 1;
+		taken = taken + 1;
+		passed = passed + 1;
+	end;
+	
+	// fail a test
+	def fail(why?)
+		cur = cur + 1;
+		taken = taken + 1;
+		failed = failed + 1;
+		def pattern = "%: test % failed";
+		if why then
+			pattern = pattern + ": " + why;
+		end;
+		log(pattern, name, cur);
+	end;
+	
+	// run a test suite
+	def runSuite(n, f)
+		name = n;
+		cur = 0;
+		if catch(f) then
+			fail("error thrown in test");
+		end;
+	end;
+	
+	// log some kind of failure
+	def log(msg, args*)
+		msgs.add(msg.subst.apply(args));
+	end;
+	
+	// failure reporting
+	def printFail(opts)
+		if opts.v then
+			msgs.each(fn(i, x) = print(x));
+			print("=======SUMMARY=======");
+		end;
+		def pattern = "FAIL: taken: % passed: % failed: %";
+		print(pattern.subst(taken, passed, failed));
+	end;	
+
+	// pass reportion
+	def printPass(opts)
+		def pstr = "PASS";
+		if opts.v then
+			pstr = pstr + ": % tests passed".subst(taken);
+		end;
+		print(pstr);
+	end;
+	
+end;
+
