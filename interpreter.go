@@ -139,7 +139,7 @@ func New() *Interpreter {
 // Start a prompt that reads expressions from stdin and prints them to stdout.
 // Swallows and prints all errors.
 func (i *Interpreter) Repl() {
-	readline.Completer = func(query string) []string {
+	readline.Completer = func(query, ctx string) []string {
 		src := i.ListDefined()
 		res := []string{}
 		for _, x := range src {
