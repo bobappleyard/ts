@@ -11,11 +11,17 @@ import (
 	. "github.com/bobappleyard/ts/bytecode"
 )
 
-const tsRoot = "/usr/local/go/src/pkg/github.com/bobappleyard/ts"
+const (
+	pkgPos = "/src/pkg/github.com/bobappleyard/ts"
+	tsRoot = "/usr/local/go" + pkgPos
+)
 
 func root() string {
 	res := os.Getenv("TSROOT")
 	if res == "" {
+		res = os.Getenv("GOROOT") + pkgPos
+	}
+	if res == pkgPos {
 		res = tsRoot
 	}
 	return res
@@ -64,7 +70,6 @@ type Accessor struct {
 	e []Slot
 }
 
-// There are two kinds of entries, fields and methods.
 type SlotKind byte
 
 const (
@@ -74,9 +79,6 @@ const (
 	Marker
 )
 
-// * Private -- only accessible to methods defined on the same class.
-//
-// * Public -- accessible to all.  
 type SlotVis byte
 
 const (

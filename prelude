@@ -81,7 +81,7 @@ def callWithCont(f)
 		return res;
 	end;
 	// followed continuation
-	if e.is(Array) && e.size() == 2 && e[0] == key then
+	if e.is(Array) && e.size == 2 && e[0] == key then
 		return e[1];
 	end;
 	// error

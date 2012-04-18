@@ -357,9 +357,22 @@ func definePrimitives(i *Interpreter) {
 		
 	i.Define("packages", pmClass.alloc())
 	pmClass.flags = Final|Primitive
+
+	i.Define("load", Wrap(func(o, p *Object) *Object {
+		i.Load(p.ToString())
+		return Nil
+	}))
 	
 	i.Define("read", Wrap(func(o *Object) *Object {
 		return Wrap(readString(os.Stdin, '\n'))
+	}))
+	
+	i.Define("names", Wrap(func(o *Object) *Object {
+		res := []*Object{}
+		for n := range i.o {
+			res = append(res, Wrap(n))
+		}
+		return Wrap(res)
 	}))
 	
 	i.Define("print", Wrap(func(o *Object, args []*Object) *Object {
@@ -379,6 +392,7 @@ func definePrimitives(i *Interpreter) {
 	i.Define("throw", Wrap(func(o, x *Object) *Object {
 		panic(x)
 	}))
+	
 	i.Define("catch", new(funcObj).init(func(p *process) {
 		defer func() {
 			if e := recover(); e != nil {
@@ -773,25 +787,7 @@ func initBaseClasses() {
 			return Nil
 		}),
 	})
-	
-	ErrorClass = ObjectClass.extend("Error", 0, []Slot {
-		FSlot("msg", ""),
-		FSlot("file", ""),
-		FSlot("line", 0),
-		MSlot("toString", func(o *Object) *Object {
-			msg := ErrorClass.Get(o, 0)
-			file := ErrorClass.Get(o, 1)
-			line := ErrorClass.Get(o, 2).ToInt()
-			if line == 0 {
-				return msg
-			}
-			return Wrap(fmt.Sprintf("%s(%d): %s", file, line, msg))
-		}),
-		MSlot("create", func(o, msg *Object) *Object {
-			ErrorClass.Set(o, 0, msg)
-			return Nil
-		}),
-	})
+
 }
 
 func (c *Class) Names(hook, deep bool) []string {
@@ -1071,6 +1067,25 @@ func initDataClasses() {
 			for i := range buf {
 				StreamClass.Call(o, 1, Wrap(buf[i]))
 			}
+			return Nil
+		}),
+	})
+
+	ErrorClass = ObjectClass.extend("Error", 0, []Slot {
+		FSlot("msg", ""),
+		FSlot("file", ""),
+		FSlot("line", 0),
+		MSlot("toString", func(o *Object) *Object {
+			msg := ErrorClass.Get(o, 0)
+			file := ErrorClass.Get(o, 1)
+			line := ErrorClass.Get(o, 2).ToInt()
+			if line == 0 {
+				return msg
+			}
+			return Wrap(fmt.Sprintf("%s(%d): %s", file, line, msg))
+		}),
+		MSlot("create", func(o, msg *Object) *Object {
+			ErrorClass.Set(o, 0, msg)
 			return Nil
 		}),
 	})
@@ -1440,7 +1455,7 @@ func initCollectionClasses() {
 			}
 			return Wrap(t[from:to])
 		}),
-		MSlot("member", func(o, x *Object) *Object {
+		MSlot("indexOf", func(o, x *Object) *Object {
 			eq := x.c.m[_Object_eq]
 			args := []*Object{nil}
 			for i, y := range o.ToArray() {

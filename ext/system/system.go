@@ -113,15 +113,13 @@ func bsPkg(itpr *ts.Interpreter) map[string] *ts.Object {
 	}
 
 	return map[string] *ts.Object {
+		"input": newStream(os.Stdin),
+		"output": newStream(os.Stdout),
 		"File": File.Object(),
 		"args": ts.Wrap(os.Args),
 		"env": ts.Wrap(env),
 		"eval": ts.Wrap(func(o, expr *ts.Object) *ts.Object {
 			return itpr.Eval(expr.ToString())
-		}),
-		"load": ts.Wrap(func(o, p *ts.Object) *ts.Object {
-			itpr.Load(p.ToString())
-			return ts.Nil
 		}),
 	}
 }
