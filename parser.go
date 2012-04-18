@@ -7,6 +7,16 @@ import (
 	. "github.com/bobappleyard/ts/parse"
 )
 
+/*func readLastId(_s string) string {
+	s := []rune(_s)
+	for i := len(s) - 1; i >= 0; i-- {
+		if !(unicode.IsLetter(s[i]) || unicode.IsDigit(s[i])) {
+			return string(s[i+1:])
+		}
+	}
+	return _s
+}*/
+
 /*******************************************************************************
 
 	Lexer

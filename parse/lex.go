@@ -77,6 +77,11 @@ func (l *Lexer) Lookahead() Token {
 	return l.t[0]
 }
 
+// Return the text that the lexer has scanned.
+func (l *Lexer) Scanned() string {
+	return string(l.src.buf[:l.src.p])
+}
+
 func (s *Source) init(src io.Reader, l *Lexer, nm string) *Source {
 	s.src = src
 	s.lex = l

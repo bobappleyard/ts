@@ -38,8 +38,8 @@ func init() {
 	initDataClasses()
 }
 
-// Given a bool, int, float64, string or []*Object return an object
-// corresponding to that value.
+// Given a bool, number, string, slice or map return an object corresponding to 
+// that value. Well, it doesn't support all those types yet.
 //
 // If a function is passed in: This function should take an object argument
 // representing the receiver, and then zero to four other object arguments
@@ -273,6 +273,22 @@ func PrimitivePackage(n string, f func(*Interpreter) map[string] *Object) {
 	})
 }
 
+const (
+	pkgPos = "/src/pkg/github.com/bobappleyard/ts"
+	tsRoot = "/usr/local/go" + pkgPos
+)
+
+func root() string {
+	res := os.Getenv("TSROOT")
+	if res == "" {
+		res = os.Getenv("GOROOT") + pkgPos
+	}
+	if res == pkgPos {
+		res = tsRoot
+	}
+	return res
+}
+
 // registration function called by New()
 func definePrimitives(i *Interpreter) {
 	path := i.Accessor("path")
@@ -368,11 +384,7 @@ func definePrimitives(i *Interpreter) {
 	}))
 	
 	i.Define("names", Wrap(func(o *Object) *Object {
-		res := []*Object{}
-		for n := range i.o {
-			res = append(res, Wrap(n))
-		}
-		return Wrap(res)
+		return Wrap(i.ListDefined())
 	}))
 	
 	i.Define("print", Wrap(func(o *Object, args []*Object) *Object {
@@ -384,8 +396,16 @@ func definePrimitives(i *Interpreter) {
 		return Nil
 	}))
 	
-	i.Define("exit", Wrap(func(o, n *Object) *Object {
-		os.Exit(n.ToInt())
+	i.Define("exit", Wrap(func(o *Object, args []*Object) *Object {
+		code := 0
+		switch len(args) {
+		case 1:
+			code = args[0].ToInt()
+		case 0:
+		default:
+			 panic(fmt.Errorf("wrong number of arguments %d", len(args)))
+		}
+		os.Exit(code)
 		return Nil
 	}))
 	

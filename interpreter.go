@@ -7,25 +7,11 @@ import (
 	"io"
 	"os"
 	"sync"
+	"strings"
 	"encoding/binary"
 	. "github.com/bobappleyard/ts/bytecode"
+	"github.com/bobappleyard/readline"
 )
-
-const (
-	pkgPos = "/src/pkg/github.com/bobappleyard/ts"
-	tsRoot = "/usr/local/go" + pkgPos
-)
-
-func root() string {
-	res := os.Getenv("TSROOT")
-	if res == "" {
-		res = os.Getenv("GOROOT") + pkgPos
-	}
-	if res == pkgPos {
-		res = tsRoot
-	}
-	return res
-}
 
 /*******************************************************************************
 
@@ -153,26 +139,34 @@ func New() *Interpreter {
 // Start a prompt that reads expressions from stdin and prints them to stdout.
 // Swallows and prints all errors.
 func (i *Interpreter) Repl() {
-	l := NewScanner(os.Stdin, "stdin")
-	for func() (cont bool) {
-		defer func() {
-			if e := recover(); e != nil {
-				fmt.Printf("\033[1;31m%s\033[0m\n", e)
-				cont = true
+	readline.Completer = func(query string) []string {
+		src := i.ListDefined()
+		res := []string{}
+		for _, x := range src {
+			if strings.HasPrefix(x, query) {
+				res = append(res, x)
 			}
-		}()/**/
-		fmt.Print("> ")
-		u := new(Unit)
-		if u.CompileStmt(l) {
-			x := i.Exec(u)
-			if x != Nil {
-				fmt.Println(x)
-			}
-			return true
 		}
-		return false
-	}() {}
-	fmt.Println()
+		return res
+	}
+	for {
+		func() {
+			defer func() {
+				if e := recover(); e != nil {
+					fmt.Printf("\033[1;31m%s\033[0m\n", e)
+				}
+			}()/**/
+			u := new(Unit)
+			l := NewScanner(readline.Reader(), "stdin")
+			if u.CompileStmt(l) {
+				readline.AddHistory(l.Scanned())
+				x := i.Exec(u)
+				if x != Nil {
+					fmt.Println(x)
+				}
+			}
+		}()
+	}
 }
 
 // Evaluate an expression, returning its value. Panics on error.
@@ -198,6 +192,7 @@ func (i *Interpreter) Load(p string) {
 	i.Exec(u)
 }
 
+// Import a package and return it.
 func (i *Interpreter) Import(n string) *Object {
 	aget := i.Accessor("__aget__")
 	return i.Get("packages").Call(aget, Wrap(n))
@@ -215,6 +210,14 @@ func (i *Interpreter) Exec(u *Unit) *Object {
 func (i *Interpreter) Defined(n string) bool {
 	b := i.lookup(n)
 	return b.c == boxClass
+}
+
+func (i *Interpreter) ListDefined() []string {
+	res := []string{}
+	for n := range i.o {
+		res = append(res, n)
+	}
+	return res
 }
 
 // Look up a global variable and return its value. Panics if the variable does 

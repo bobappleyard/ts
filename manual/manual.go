@@ -1,14 +1,10 @@
-Introduction
-============
+/*
 
 TranScript is a dynamic object oriented language. It is designed to avoid some
 of the major shortcomings of existing dynamic languages, particularly with
 respect to performance.
 
-Note that this manual is incomplete.
-
-Getting started
-===============
+GETTING STARTED
 
 Follow the README for build instructions. For now navigating to the project
 directory and typing:
@@ -23,26 +19,21 @@ these:
 	"Hello" + ", world!";
 	(fn(a) = a(a))(fn(a) = a(a)); // this should pin the cpu
 
-Using the interpreter
-=====================
+USING THE INTERPRETER
 
 The interpreter comes in two basic modes:
 
-* **Script** -- Executes a TranScript program. This program may be in source form 
+* Script -- Executes a TranScript program. This program may be in source form 
   or in binary form.
 
-* **Prompt** -- The interpreter compiles an evaluates expressions as they are
+* Prompt -- The interpreter compiles an evaluates expressions as they are
   entered into a terminal. Useful for finding out about the system.
 
-Script files
-------------
+SCRIPT FILES
 
 Script files are text files whose names end in ".bs". They contain a series of
 toplevel statements that are to be executed by the runtime, each terminated
 with `;`.
-
-Script
-------
 
 Running the interpreter with a file as its first argument treats that file as
 as TranScript program and runs it.
@@ -59,16 +50,11 @@ The interpreter provides a variable named "args" containing the name of the
 script followed by the arguments to the script. Those arguments come after the
 name of the script on the command line. 
 
-Prompt
-------
-
 Running the interpreter with no parameters gives a prompt. 
 
 	./bsi
 
-
-Using the compiler
-==================
+USING THE COMPILER
 
 Using the `-c` command line switch invokes the TranScript compiler. Pass in the 
 source files that you want compiled.
@@ -81,8 +67,7 @@ file. Override this using `-o`.
 
 	./bsi -c -o <output file> <input files> ...
 
-The TranScript language
-======================
+THE TRANSCRIPT LANGUAGE
 
 TranScript is like many object-oriented languages in that everything is an
 object. Functions are objects too, and have full lexical scope and tail
@@ -91,13 +76,13 @@ recursion. Objects are described by classes, which are themselves objects.
 Because of this, the types described in this section have extra capabilities
 that are described in the library section.
 
-Basic syntax
-------------
+BASIC SYNTAX
 
 Comments are like C++
 
 	// line comment
 	/* block comment */
+/*
 
 Numbers are represented as series of digits, optionally separated with `.`
 and/or preceded with `-`.
@@ -186,16 +171,17 @@ In each pair, the key is separated from the value by `:`.
 Any object may be a key or a value. Only strings and numbers are likely to be
 useful keys most of the time, though.
 
-Control structures
-------------------
+CONTROL STRUCTURES
 
-A **block** is a series of statements, each punctuated with a `;`.
+A block is a series of statements, each punctuated with a `;`.
 
 	a = 1;
 	b = 2;
 	print(a + b);
 
-An **if statement** evaluates an expression. If it evaluates to `true` then `if` 
+Blocks have their own scope. This is described in more detail below.
+
+An if statement evaluates an expression. If it evaluates to `true` then `if` 
 evalutates its `then` block. If the expression evaluates to `false` then `if` 
 evaluates its else block. Every value other than `false` is counted as `true` to
 an `if` statement.
@@ -214,18 +200,9 @@ e.g.
 
 This prints `a is less than five`.
 
-Variables
----------
+VARIABLES AND SCOPE
 
 Variables allow you to store state and refer to the results of expresssions.
-They may appear in three different contexts:
-
-* **Toplevel variables** -- Always visible everywhere. Can be manipulated by the
-  host runtime easily.
-
-* **Fields** -- Store state on objects.
-
-* **Local variables** -- Only visible in the scopes they are declared in.
 
 Defining a variable looks like
 
@@ -267,30 +244,18 @@ altered in place rather than shadowed.
 
 This now prints `2 2`.
 
-Functions
----------
+FUNCTIONS
 
 Functions are an important part of TranScript. They are first-class, have
-lexical scope, and are properly tail-recursive. Functions appear in three main
-contexts:
-
-* **Toplevel functions** -- These are defined globally and are visible
-  everywhere.
-
-* **Internal functions** -- These are defined inside other functions and are
-  only visible in the blocks they are defined in.
-
-* **Methods** -- These are used to implement object behaviours. In most ways
-  methods are just like ordinary functions, but there are differences that are
-  explained in a later section.
+lexical scope, and are properly tail-recursive.
 
 Functions can be defined in two ways.
 
-**Named functions**:
+Named functions:
 
 	def <name>(<args>) <body>
 
-**Anonymous functions**:
+Anonymous functions:
 
 	fn (<args>) <body>
 
@@ -379,16 +344,15 @@ people call "closures," others call "lexical scope."
 	a(1);                   // 2
 	a(4);                   // 6
 
-Objects
--------
+OBJECTS
 
 Objects are collections of *slots*. There are three kinds of slot:
 
-* **Fields** -- These provide storage on the object.
+* Fields -- These provide storage on the object.
 
-* **Methods** -- These are functions that are associated with the object.
+* Methods -- These are functions that are associated with the object.
 
-* **Properties** -- These look like fields but call methods underneath.
+* Properties -- These look like fields but call methods underneath.
 
 Objects primarily support one operation, `.`.
 
@@ -404,8 +368,7 @@ relationship.
 
 Prints `true`.
 
-Classes
--------
+CLASSES
 
 Classes describe objects. They support one operation, which is to construct an 
 instance.
@@ -451,14 +414,13 @@ calls `create` and then returns the new object.
 Classes have access specifiers that control which members are visible where.
 There are three kinds of access:
 
-* **Private** -- The member is visible only to that class.
+* Private -- The member is visible only to that class.
 
-* **Public** -- The member is visible everywhere.
+* Public -- The member is visible everywhere.
 
 This is done using the `private` and `public` keywords.
 
-Methods
--------
+METHODS
 
 Methods are functions that are attached to classes. When in the body of a method 
 an extra variable is available, `this`, which represents the object the method
@@ -483,8 +445,7 @@ Prints `1`.
 This is contrasted with Javascript, the behaviour of which is often confusing to
 newcomers in this regard.
 
-Properties
-----------
+PROPERTIES
 
 Properties are pairs of methods, a *getter* and a *setter*. The property is
 accessed like a field. When the property is read from, the getter is called with 
@@ -492,13 +453,7 @@ zero parameters. Its return value is taken to be the value of the property. When
 the property is written to, the setter is called with one parameter. This
 parameter represents the right hand side of the assignment.
 
-Packages
-========
-
-
-
-The TranScript library
-=====================
+THE TRANSCRIPT LIBRARY
 
 This is extremely small and underpowered. Most of the work so far has gone into
 the basic behaviour of the language.
@@ -506,65 +461,74 @@ the basic behaviour of the language.
 Before discussing the built-in classes, there are some toplevel functions
 defined by the runtime. Many of these will disappear with time.
 
-* **print(x...)**  
-  Print 0 or more objects to standard output.
+	print(x...)
 
-* **read()**  
-  Read a line from standard input.
+Print 0 or more objects to standard output.
 
-* **exit(code)**  
-  Exit the process with the given code.
+	read()
 
-* **throw(x)**  
-  Throw an error.
+Read a line from standard input.
 
-* **catch(thk)**  
-  Catch an error: Call `thk`. If an error is thrown while `thk` is executing, 
+	exit(code)	
+
+Exit the process with the given code.
+
+	throw(x)	
+
+Throw an error.
+
+	catch(thk)	
+
+Catch an error: Call `thk`. If an error is thrown while `thk` is executing, 
   return it. Otherwise return `false`.
 
-Object
-------
+OBJECT
 
 The root class. All objects instantiate Object.
 
-* **copy()**  
-  Creates a copy of the object.
+	copy()	
 
-* **toString()**  
-  The default method for string conversion/printing.
+Creates a copy of the object.
 
-* **is(c)**  
-  Test whether the object instantiates class `c`.
+	toString()	
 
-* **type()**  
-  The object's class.
+The default method for string conversion/printing.
 
-Function
---------
+	is(c)	
+
+Test whether the object instantiates class `c`.
+
+	type()	
+
+The object's class.
+
+FUNCTION
 
 *final, primitive*
 
-* **apply(args)**  
-  Call the function, passing `args`, which should be an array containing the
+	apply(args)	
+
+Call the function, passing `args`, which should be an array containing the
   intended arguments to the function.
 
-Class
------
+CLASS
 
 *final, primitive*
 
-* **name()**  
-  Returns the name of the class in question.
+	name()	
 
-* **names()**  
-  Returns the names of members this class defines.
+Returns the name of the class in question.
 
-* **allNames()**  
-  Returns all the defined members. That is, it includes members defined in all
+	names()	
+
+Returns the names of members this class defines.
+
+	allNames()	
+
+Returns all the defined members. That is, it includes members defined in all
   of the class' ancestors.
 
-Number
-------
+NUMBER
 
 *final, primitive*
 
@@ -572,22 +536,25 @@ There are two classes which descend from `Number`, `Integer` and `Float`. These
 have the same interface as `Number` but actually implement it. `Number` is,
 itself, absolutely useless.
 
-* **toInt()**  
-  Convert the number to an integer.
+	toInt()	
 
-* **toFloat()**  
-  Convert the number to a float.
+Convert the number to an integer.
 
-String
-------
+	toFloat()	
+
+Convert the number to a float.
+
+STRING
 
 *final, primitive*
 
-* **length()**  
-  Returns the number of characters in the string.
+	length()	
 
-* **split(sep?)**  
-  Returns an array of substrings. If called with no parameters or the parameter
+Returns the number of characters in the string.
+
+	split(sep?)	
+
+Returns an array of substrings. If called with no parameters or the parameter
   is an empty string, each substring represents a character from the string.
   Otherwise the parameter is a delimiter, and each substring is made of
   contiguous regions of the string that are not the delimiter.
@@ -596,85 +563,106 @@ String
 
 	text.split("\n").map(fn(x) = x.split(","))
 
-* **subst(args*)**  
-  Returns a string where occurrences of `%` are replaced with the corresponding
+	subst(args*)	
+
+Returns a string where occurrences of `%` are replaced with the corresponding
   argument.
 
-* **toInt()**  
-  Convert the string to an integer.
+	toInt()	
 
-* **toFloat()**  
-  Convert the string to a float.
+Convert the string to an integer.
 
-* **toNumber()**  
-  Convert the string to a number.
+	toFloat()	
 
-* **startsWith(s)**  
-  Does the string start with `s`?
+Convert the string to a float.
 
-* **endsWith(s)**  
-  Does the string end with `s`?
+	toNumber()	
 
-* **contains(s)**  
-  Does the string contain `s`?
+Convert the string to a number.
 
-* **match(e)**  
-  Does the string match the regular expression `e`?
+	startsWith(s)	
 
-* **trim(s?)**  
-  Remove any characters in `s` from the beginning and end of the string. If no 
+Does the string start with `s`?
+
+	endsWith(s)	
+
+Does the string end with `s`?
+
+	contains(s)	
+
+Does the string contain `s`?
+
+	match(e)	
+
+Does the string match the regular expression `e`?
+
+	trim(s?)	
+
+Remove any characters in `s` from the beginning and end of the string. If no 
   parameter is provided, default to whitespace characters.
 
-* **trimLeft(s?)**  
-  Remove any characters in `s` from the beginning of the string. If no parameter 
+	trimLeft(s?)	
+
+Remove any characters in `s` from the beginning of the string. If no parameter 
   is provided, default to whitespace characters.
 
-* **trimRight(s?)**  
-  Remove any characters in `s` from the end of the string. If no parameter is 
+	trimRight(s?)	
+
+Remove any characters in `s` from the end of the string. If no parameter is 
   provided, default to whitespace characters.
 
-* **quote()**  
-  Returns the quoted representation of the string.
+	quote()	
 
-* **unquote()**  
-  Given the string is a quoted representation, return the string that it 
+Returns the quoted representation of the string.
+
+	unquote()	
+
+Given the string is a quoted representation, return the string that it 
   represents.
 
-Array
------
+ARRAY
 
 *final*
 
-* **length()**  
-  Returns the number of items in the array.
+	length()	
 
-* **add(x*)**  
-  Adds an item to the array.
+Returns the number of items in the array.
 
-* **remove(x)**  
-  Removes all instances of an item from the array.
+	add(x*)	
 
-* **insert(i, x)**  
-  Inserts an item to the array at the given index.
+Adds an item to the array.
 
-* **delete(i)**  
-  Deletes an item to the array with the given index.
+	remove(x)	
 
-* **slice(from?, to?)**  
-  Returns a section of the array starting at `from` and ending on the element
+Removes all instances of an item from the array.
+
+	insert(i, x)	
+
+Inserts an item to the array at the given index.
+
+	delete(i)	
+
+Deletes an item to the array with the given index.
+
+	slice(from?, to?)	
+
+Returns a section of the array starting at `from` and ending on the element
   before `to`. This is an array that shares structure with the original array,
   so changes to one are reflected in the other.
 
-* **each(f)**  
-  Calls `f` on every item in the array, passing in the index followed by the
+	each(f)	
+
+Calls `f` on every item in the array, passing in the index followed by the
   item.
 
-* **filter(f)**  
-  Returns an array containing all the elements for which a call to `f` returns
+	filter(f)	
+
+Returns an array containing all the elements for which a call to `f` returns
   a true value (anything but `false`).
 
-* **map(f)**  
-  Returns an array containing all the return values of calling `f` on each item
+	map(f)	
+
+Returns an array containing all the return values of calling `f` on each item
   in the current array, in order.  
   
   i.e.
@@ -688,27 +676,33 @@ Array
 		r.add(x+5);
 	end);
 
-* **reduce(x, f)**  
-  Apply `f` to every item in the array, passing the return value of the previous 
+	reduce(x, f)	
+
+Apply `f` to every item in the array, passing the return value of the previous 
   call into the next call. 
 
-* **join(sep?)**  
-  Given an array of strings, return a single string consisting of each item in
+	join(sep?)	
+
+Given an array of strings, return a single string consisting of each item in
   the array concatenated together, separated with `sep` (or "" if the parameter
   is not present).
 
-Hash
-----
+HASH
 
 *final*
 
-* **keys()**  
-  Return all the keys on this hash.
+	keys()	
 
-* **each(f)**  
-  Calls `f` on every item in the hash, passing in the key followed by the item.
+Return all the keys on this hash.
 
-* **map(f)**
-  Returns a map containing all the return values of calling `f` on each item in
-  the map.
+	each(f)	
+
+Calls `f` on every item in the hash, passing in the key followed by the item.
+
+	map(f)
+
+Returns a map containing all the return values of calling `f` on each item in
+the map.
+*/
+package manual
 

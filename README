@@ -26,11 +26,12 @@ objects. Classes are themselves (immutable) objects.
 Install
 -------
 
-	 go get github.com/bobappleyard/ts...
+	 go get github.com/bobappleyard/ts
 
 Installs the TranScript SDK. You may need to be root to do this.
 
 Components:
+
 	- Framework for compiling and interpreting TranScript code (ts)
 	- Simple parser framework (ts/parse)
 	- Bytecode specification (ts/bytecode)
@@ -39,11 +40,14 @@ Components:
 Use
 ---
 
-Below is an example interpreter.
+Below is an example interpreter that uses all of the provided extensions.
 
 	package main
 
-	import "github.com/bobappleyard/ts"
+	import  (
+		"github.com/bobappleyard/ts"
+		_ "github.com/bobappleyard/ts/ext"
+	)
 
 	func main() {
 		i := ts.New()
@@ -52,7 +56,7 @@ Below is an example interpreter.
 
 A more feature-rich interpreter is available from:
 
-	http://bobappleyard.github.com/ts/install.html
+	http://www.github.com/bobappleyard/tsi
 
 Read more
 ---------
