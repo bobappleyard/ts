@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"net/http"
+	"net/url"
 	"github.com/bobappleyard/ts"
 )
 
@@ -52,6 +53,30 @@ func webPkg(itpr *ts.Interpreter) map[string] *ts.Object {
 			}
 			http.ListenAndServe(port, http.HandlerFunc(hnd))
 			return ts.Nil
+		}),
+		"get": ts.Wrap(func(o, u *ts.Object) *ts.Object {
+			resp, err := http.Get(u.ToString())
+			if err != nil {
+				panic(err)
+			}
+			if resp.StatusCode != 200 {
+				panic(fmt.Errorf("web.get: status %d", resp.StatusCode))
+			}
+			return ts.Wrap(resp.Body)
+		}),
+		"post": ts.Wrap(func(o, u, form *ts.Object) *ts.Object {
+			vals := url.Values{}
+			for k, v := range form.ToHash() {
+				vals.Add(k.(string), v.ToString())
+			}
+			resp, err := http.PostForm(u.ToString(), vals)
+			if err != nil {
+				panic(err)
+			}
+			if resp.StatusCode != 200 {
+				panic(fmt.Errorf("web.get: status %d", resp.StatusCode))
+			}
+			return ts.Wrap(resp.Body)
 		}),
 	}
 }

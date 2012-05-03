@@ -463,16 +463,14 @@ func (u *Unit) compileMutation(n *Node, e compilerCtx) {
 		nm := n.Child[0].Token.Text
 		e.write(SET, u.getAccessor(nm), e.static(nm))
 	case varNode:
-		t := n.Child[0].Token
-		if !e.isBoxed(t.Text) {
-			panic(fmt.Errorf("invalid location for writing: %s", t.Text))
-		}
 		u.compileNode(n.Child[1], e)
 		e.write(PUSH)
 		u.compileLookup(n.Child[0], e)
 		e.write(UPDATE)
 	default:
-		panic(fmt.Errorf("invalid location for writing"))
+		file := n.Token.File
+		line := n.Token.Line
+		panic(fmt.Errorf("%s(%d): invalid location for writing", file, line))
 	}
 }
 

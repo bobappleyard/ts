@@ -8,7 +8,7 @@ import (
 type Parser struct {
 	pp map[key] Prefix
 	ip map[key] Infix
-	el *Parser
+	el Prefix
 }
 
 type key struct {
@@ -89,11 +89,11 @@ func (n *Node) String() string {
 
 // Parse an expression at a given precedence level, returning a syntax tree.
 func (p *Parser) Parse(l *Lexer, prec int) *Node {
-	t := l.Next()
-	return p.parseInner(l, prec, t)
+	return p.ParseWith(l, prec, l.Next())
 }
 
-func (p *Parser) parseInner(l *Lexer, prec int, t Token) *Node {
+// Parse an expression at a given precedence level, given an initial token.
+func (p *Parser) ParseWith(l *Lexer, prec int, t Token) *Node {
 	pp := p.pp[key{t.Kind, t.Text}]
 	if pp == nil {
 		pp = p.pp[key{t.Kind, ""}]
@@ -102,7 +102,7 @@ func (p *Parser) parseInner(l *Lexer, prec int, t Token) *Node {
 		if p.el == nil {
 			panic(Unexpected(t))
 		}
-		return p.el.parseInner(l, prec, t)
+		pp = p.el
 	}
 	left := pp.Prefix(p, l, t)
 	for {
@@ -143,13 +143,13 @@ func (p *Parser) RegBoth(k int, s string, bp Both) {
 }
 
 // Register a handler for a failure to match
-func (p *Parser) RegElse(ep *Parser) {
+func (p *Parser) RegElse(ep Prefix) {
 	p.el = ep
 }
 
 func TokenError(format string, t Token, args... interface{}) error {
 	args = append([]interface{}{t.File, t.Line}, args...)
-	return fmt.Errorf("[%s:%d] " + format, args...)
+	return fmt.Errorf("%s(%d): " + format, args...)
 }
 
 func Expected(s string, t Token) error {

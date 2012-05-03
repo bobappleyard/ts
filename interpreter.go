@@ -150,14 +150,18 @@ func (i *Interpreter) Repl() {
 		return res
 	}
 	for {
-		func() {
+		if func() bool {
 			defer func() {
 				if e := recover(); e != nil {
 					fmt.Printf("\033[1;31m%s\033[0m\n", e)
 				}
 			}()/**/
 			u := new(Unit)
-			l := NewScanner(readline.Reader(), "stdin")
+			r := readline.Reader()
+			if _, e := r.Read(nil); e == io.EOF {
+				return true
+			}
+			l := NewScanner(r, "stdin")
 			if u.CompileStmt(l) {
 				readline.AddHistory(l.Scanned())
 				x := i.Exec(u)
@@ -165,8 +169,12 @@ func (i *Interpreter) Repl() {
 					fmt.Println(x)
 				}
 			}
-		}()
+			return false
+		}() {
+			break
+		}
 	}
+	fmt.Println()
 }
 
 // Evaluate an expression, returning its value. Panics on error.
@@ -214,8 +222,10 @@ func (i *Interpreter) Defined(n string) bool {
 
 func (i *Interpreter) ListDefined() []string {
 	res := []string{}
-	for n := range i.o {
-		res = append(res, n)
+	for n, v := range i.o {
+		if v.c == boxClass {
+			res = append(res, n)
+		}
 	}
 	return res
 }

@@ -7,15 +7,6 @@ import (
 	. "github.com/bobappleyard/ts/parse"
 )
 
-/*func readLastId(_s string) string {
-	s := []rune(_s)
-	for i := len(s) - 1; i >= 0; i-- {
-		if !(unicode.IsLetter(s[i]) || unicode.IsDigit(s[i])) {
-			return string(s[i+1:])
-		}
-	}
-	return _s
-}*/
 
 /*******************************************************************************
 
@@ -191,6 +182,8 @@ var keywords = []string {
 	"class", "new", "this", "super",
 	"private", "public",
 	"package", "export", "import",
+	"loop", "continue", "break",
+	"for", "in", "do",
 }
 
 func checkKeyword(t Token) {
@@ -240,88 +233,8 @@ func parseBlock(l *Lexer, n *Node) {
 			l.Next()
 			return
 		}
-		n.Add(parseStmt(l))
+		n.Add(stmt.Parse(l, 0))
 		Expect(";", l.Next())
-	}
-}
-
-// packages
-func parsePkg(l *Lexer) *Node {
-	n := new(Node)
-	en := new(Node)
-	n.Add(parseDotted(l), en)
-	loop: for {
-		switch l.Lookahead().Text {
-		case "export":
-			l.Next()
-			parseList(l, en, ";", func() *Node {
-				x := parseName(l)
-				x.Kind = varNode
-				return x
-			})
-		case "end":
-			l.Next()
-			break loop
-		default:
-			n.Add(parseStmt(l))
-		}
-		Expect(";", l.Next())
-	}
-	return transPkg(n)
-}
-
-func transPkg(n *Node) *Node {
-	// the package location
-	nm, loc := transDotted(n.Child[0])
-	pl := kNode(alookNode).Add(tNode(varNode, "packages"), vNode(loc))
-	// export as instance of class
-	ds := kNode(defNode)
-	pc := kNode(classNode).Add(nil, nil, tNode(varNode, "Package"), ds)
-	for _, x := range n.Child[1].Child {
-		// use properties to thread access
-		d := &Node{Kind: propNode, Data: Public}
-		p := tNode(varNode, "@x")
-		g := kNode(fnNode).Add(new(Node), kNode(retNode).Add(x))
-		s := kNode(fnNode).Add(new(Node).Add(p), kNode(mutNode).Add(x, p))
-		ds.Add(d.Add(x, new(Node).Add(g, s)))
-	}
-	// package internal runs inside a block
-	fn := kNode(fnNode).Add(new(Node))
-	fn.Add(n.Child[2:]...)
-	fn.Add(kNode(retNode).Add(kNode(newNode).Add(pc, vNode(nm))))
-	return kNode(mutNode).Add(pl, kNode(callNode).Add(fn))
-}
-
-func parseDotted(l *Lexer) *Node {
-	nm := parseName(l)
-	for l.Lookahead().Text == "." {
-		l.Next()
-		nm.Add(parseName(l))
-	}
-	return nm
-}
-
-func transDotted(x *Node) (string, string) {
-	nm, loc := x.Token.Text, x.Token.Text
-	for _, y := range x.Child {
-		nm = y.Token.Text
-		loc += "/" + nm
-	}
-	return nm, loc
-}
-
-func parseImp(l *Lexer, n *Node) {
-	parseList(l, n, ";", func() *Node {
-		return parseDotted(l)
-	})
-}
-
-func transImp(n, d *Node) {
-	for _, x := range n.Child {
-		impn, impl := transDotted(x)
-		lo := &Node{Kind:alookNode, Token: x.Token}
-		lo.Add(tNode(varNode, "packages"), vNode(impl))
-		d.Add(kNode(defNode).Add(tNode(0, impn), lo))
 	}
 }
 
@@ -439,7 +352,13 @@ func parseId(p *Parser, l *Lexer, t Token) *Node {
 	return &Node{Kind: varNode, Token: t}
 }
 
-func parseDef(l *Lexer, v SlotVis) *Node {
+func parseDef(p *Parser, l *Lexer, t Token) *Node {
+	n := parseDefv(l, Public)
+	n.Token = t
+	return n
+}
+
+func parseDefv(l *Lexer, v SlotVis) *Node {
 	n := &Node{Kind: defNode}
 	loop: for {
 		c := &Node{Kind: varNode, Data: v}
@@ -552,9 +471,10 @@ func parseFn(l *Lexer) *Node {
 		return n
 	})
 	Expect(")", l.Next())
-	if l.Lookahead().Text == "=" {
+	t := l.Lookahead()
+	if t.Text == "=" {
 		l.Next()
-		fn.Add(kNode(retNode).Add(expr.Parse(l, 0)))
+		fn.Add((&Node{Kind: retNode, Token: t}).Add(expr.Parse(l, 0)))
 	} else {
 		parseBlock(l, fn)
 	}
@@ -587,6 +507,7 @@ func (q arrParser) Precedence(t Token) int {
 
 func (q arrParser) Infix(p *Parser, l *Lexer, left *Node, t Token) *Node {
 	n := kNode(alookNode).Add(left)
+	n.Token = t
 	parseList(l, n, "]", func() *Node {
 		return p.Parse(l, 0)
 	})
@@ -629,6 +550,7 @@ type objParser struct { p int }
 
 func (q objParser) Prefix(p *Parser, l *Lexer, t Token) *Node {
 	n := kNode(newNode)
+	n.Token = t
 	if l.Lookahead().Text == "class" {
 		l.Next()
 		n.Add(parseClass(l, nil, nil))
@@ -674,10 +596,7 @@ func parseClass(l *Lexer, nm, gl *Node) *Node {
 		case "public":
 			v = Public
 		case "def":
-			n.Add(parseDef(l, v))
-			Expect(";", l.Next())
-		case "class":
-			n.Add(parseInnerClass(l, v))
+			n.Add(parseDefv(l, v))
 			Expect(";", l.Next())
 		case "end":
 			break loop
@@ -692,13 +611,154 @@ func parseAnonClass(p *Parser, l *Lexer, t Token) *Node {
 	return parseClass(l, nil, nil)
 }
 
-func parseInnerClass(l *Lexer, v SlotVis) *Node {
+func parseInnerClass(p *Parser, l *Lexer, t Token) *Node {
 	nm := parseName(l)
-	c := (&Node{Kind: defNode, Data: v}).Add(nm, parseClass(l, nm, nil))
+	c := kNode(varNode).Add(nm, parseClass(l, nm, nil))
 	return kNode(defNode).Add(c)
 }
 
-// statements
+func parseReturn(p *Parser, l *Lexer, t Token) *Node {
+	n := &Node{Kind: retNode, Token: t}
+	if l.Lookahead().Text == ";" {
+		n.Add(vNode(Nil))
+	} else {
+		n.Add(expr.Parse(l, 0))
+	}
+	return n
+}
+
+func parseStmt(p *Parser, l *Lexer, t Token) *Node {
+	n := expr.ParseWith(l, 0, t)
+	if l.Lookahead().Text == "=" {
+		l.Next()
+		loc := n
+		n = &Node{Kind: mutNode, Token: t}
+		n.Add(loc)
+		n.Add(expr.Parse(l, 0))
+	}
+	return n
+}
+		
+func parseIf(p *Parser, l *Lexer, t Token) *Node {
+	n := &Node{Kind: ifNode, Token: t}
+	cn := expr.Parse(l, 0)
+	Expect("then", l.Next())
+	tn := new(Node)
+	en := new(Node)
+	loop: for {
+		t = l.Lookahead()
+		switch t.Text {
+		case "end":
+			l.Next()
+			break loop
+		case "else":
+			l.Next()
+			parseBlock(l, en)
+			break loop
+		case "elif":
+			l.Next()
+			en.Add(parseIf(p, l, t))
+			break loop
+		}
+		tn.Add(stmt.Parse(l, 0))
+		Expect(";", l.Next())
+	}
+	n.Add(cn)
+	n.Add(tn)
+	n.Add(en)
+	return n
+}
+
+// packages
+func parsePkg(l *Lexer) *Node {
+	n := new(Node)
+	en := new(Node)
+	n.Add(parseDotted(l), en)
+	loop: for {
+		switch l.Lookahead().Text {
+		case "export":
+			l.Next()
+			parseList(l, en, ";", func() *Node {
+				x := parseName(l)
+				x.Kind = varNode
+				return x
+			})
+		case "end":
+			l.Next()
+			break loop
+		default:
+			n.Add(stmt.Parse(l, 0))
+		}
+		Expect(";", l.Next())
+	}
+	return transPkg(n)
+}
+
+func transPkg(n *Node) *Node {
+	// the package location
+	nm, loc := transDotted(n.Child[0])
+	pl := kNode(alookNode).Add(tNode(varNode, "packages"), vNode(loc))
+	// export as instance of class
+	ds := kNode(defNode)
+	pc := kNode(classNode).Add(
+		tNode(varNode, nm), nil, 
+		tNode(varNode, "Package"), ds,
+	)
+	for _, x := range n.Child[1].Child {
+		// use properties to thread access
+		d := &Node{Kind: propNode, Data: Public}
+		p := tNode(varNode, "@x")
+		g := kNode(fnNode).Add(new(Node), kNode(retNode).Add(x))
+		s := kNode(fnNode).Add(new(Node).Add(p), kNode(mutNode).Add(x, p))
+		ds.Add(d.Add(x, new(Node).Add(g, s)))
+	}
+	// package internal runs inside a block
+	fn := kNode(fnNode).Add(new(Node))
+	fn.Add(n.Child[2:]...)
+	fn.Add(kNode(retNode).Add(kNode(newNode).Add(pc, vNode(nm))))
+	return kNode(mutNode).Add(pl, kNode(callNode).Add(fn))
+}
+
+func parseDotted(l *Lexer) *Node {
+	nm := parseName(l)
+	for l.Lookahead().Text == "." {
+		l.Next()
+		nm.Add(parseName(l))
+	}
+	return nm
+}
+
+func transDotted(x *Node) (string, string) {
+	nm, loc := x.Token.Text, x.Token.Text
+	for _, y := range x.Child {
+		nm = y.Token.Text
+		loc += "/" + nm
+	}
+	return nm, loc
+}
+
+func transImp(n, d *Node) {
+	for _, x := range n.Child {
+		impn, impl := transDotted(x)
+		lo := &Node{Kind:alookNode, Token: x.Token}
+		lo.Add(tNode(varNode, "packages"), vNode(impl))
+		d.Add(kNode(defNode).Add(tNode(0, impn), lo))
+	}
+}
+
+func parseImport(p *Parser, l *Lexer, t Token) *Node {
+	m := new(Node)
+	parseList(l, m, ";", func() *Node {
+		return parseDotted(l)
+	})
+	n := &Node{Kind: defNode}
+	transImp(m, n)
+	return n
+}
+
+// tying it all together
+var expr, stmt = new(Parser), new(Parser)
+
 func parseToplevel(l *Lexer) *Node {
 	t := l.Lookahead()
 	if t.Kind == eof {
@@ -714,82 +774,11 @@ func parseToplevel(l *Lexer) *Node {
 		l.Next()
 		n = parsePkg(l)
 	default:
-		n = parseStmt(l)
+		n = stmt.Parse(l, 0)
 	}
 	Expect(";", l.Next())
 	return n
 }
-
-func parseStmt(l *Lexer) *Node {
-	t := l.Lookahead()
-	var n *Node
-	switch t.Text {
-	case "import":
-		l.Next()
-		m := new(Node)
-		parseImp(l, m)
-		n = &Node{Kind: defNode}
-		transImp(m, n)
-	case "class":
-		l.Next()
-		n = parseInnerClass(l, Public)
-	case "def":
-		l.Next()
-		n = parseDef(l, Public)
-	case "if":
-		l.Next()
-		n = parseIf(l)
-	case "return":
-		l.Next()
-		n = &Node{Kind: retNode, Token: t}
-		if l.Lookahead().Text == ";" {
-			n.Add(vNode(Nil))
-		} else {
-			n.Add(expr.Parse(l, 0))
-		}
-	default:
-		n = expr.Parse(l, 0)
-		if l.Lookahead().Text == "=" {
-			l.Next()
-			loc := n
-			n = &Node{Kind: mutNode}
-			n.Add(loc)
-			n.Add(expr.Parse(l, 0))
-		}
-	}
-	return n
-}
-		
-func parseIf(l *Lexer) *Node {
-	n := &Node{Kind: ifNode}
-	cn := expr.Parse(l, 0)
-	Expect("then", l.Next())
-	tn := new(Node)
-	en := new(Node)
-	loop: for {
-		switch l.Lookahead().Text {
-		case "end":
-			l.Next()
-			break loop
-		case "else":
-			l.Next()
-			parseBlock(l, en)
-			break loop
-		case "elif":
-			l.Next()
-			en.Add(parseIf(l))
-			break loop
-		}
-		tn.Add(parseStmt(l))
-		Expect(";", l.Next())
-	}
-	n.Add(cn)
-	n.Add(tn)
-	n.Add(en)
-	return n
-}
-
-var expr = new(Parser)
 
 func init() {
 	expr.RegPrefix(eof, "", ParserFunc(parseEof))
@@ -798,11 +787,13 @@ func init() {
 	expr.RegPrefix(inum, "", ParserFunc(parseInum))
 	expr.RegPrefix(fnum, "", ParserFunc(parseFnum))
 	expr.RegPrefix(id, "", ParserFunc(parseId))
-	expr.RegPrefix(id, "true", ParserFunc(parseBuiltin))
-	expr.RegPrefix(id, "false", ParserFunc(parseBuiltin))
-	expr.RegPrefix(id, "nil", ParserFunc(parseBuiltin))
-	expr.RegPrefix(id, "this", ParserFunc(parseBuiltin))
-	expr.RegPrefix(id, "super", ParserFunc(parseBuiltin))
+
+	bip := ParserFunc(parseBuiltin)
+	expr.RegPrefix(id, "true", bip)
+	expr.RegPrefix(id, "false", bip)
+	expr.RegPrefix(id, "nil", bip)
+	expr.RegPrefix(id, "this", bip)
+	expr.RegPrefix(id, "super", bip)
 	
 	objs := objParser{120}
 	expr.RegPrefix(id, "new", objs)
@@ -837,5 +828,15 @@ func init() {
 	
 	expr.RegInfix(op, "||", logOp{20})
 	expr.RegInfix(op, "&&", logOp{20})
+	
+	
+	stmt.RegPrefix(id, "def", ParserFunc(parseDef))
+	stmt.RegPrefix(id, "class", ParserFunc(parseInnerClass))
+	stmt.RegPrefix(id, "if", ParserFunc(parseIf))
+	stmt.RegPrefix(id, "return", ParserFunc(parseReturn))
+//	stmt.RegPrefix(id, "loop", ParserFunc(parseLoop))
+//	stmt.RegPrefix(id, "for", ParserFunc(parseFor))
+	stmt.RegPrefix(id, "import", ParserFunc(parseImport))
+	stmt.RegElse(ParserFunc(parseStmt))
 }
 

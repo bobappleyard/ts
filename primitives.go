@@ -28,7 +28,7 @@ var ClassClass, AccessorClass, NilClass, BooleanClass, TrueClass, FalseClass,
     stringIterator, arrayIterator, hashIterator *Class
 
 // Built in values.
-var Nil, True, False *Object
+var Nil, True, False, Done *Object
 
 func init() {
 	initBaseClasses()
@@ -244,6 +244,13 @@ func (o *Object) ToClass() *Class {
 	return (*clsObj)(unsafe.Pointer(o)).d
 }
 
+func (o *Object) ToHash() map[interface{}] *Object {
+	o.checkClass(o.c == HashClass)
+	return (*hashObj)(unsafe.Pointer(o)).d
+}
+
+
+
 func (o *Object) UserData() interface{} {
 	o.checkClass(o.c.flags & UserData != 0)
 	return (*userObj)(unsafe.Pointer(o)).d
@@ -342,7 +349,7 @@ func definePrimitives(i *Interpreter) {
 		ObjectClass, ClassClass, FunctionClass, AccessorClass,
 		BooleanClass, TrueClass, FalseClass, NilClass,
 		NumberClass, IntClass, FltClass,
-		IteratorClass, CollectionClass,
+		IteratorClass, 
 		StringClass, ArrayClass,  
 		HashClass, pmClass, pkgClass,
 		arrayIterator, hashIterator, stringIterator, ErrorClass,
@@ -426,6 +433,7 @@ func definePrimitives(i *Interpreter) {
 		p.ret(False)
 	}))
 	
+	i.Define("done", Done)
 }
 
 /*******************************************************************************
@@ -522,11 +530,6 @@ func (o *arrObj) init(x []*Object) *Object {
 type hashObj struct {
 	Object
 	d map[interface{}] *Object
-}
-
-func (o *Object) hashData() map[interface{}] *Object {
-	o.checkClass(o.c == HashClass)
-	return (*hashObj)(unsafe.Pointer(o)).d
 }
 
 func (o *hashObj) init(m map[interface{}] *Object) *Object {
@@ -717,6 +720,18 @@ func initBaseClasses() {
 		}),
 	}
 	
+	NilClass = ObjectClass.extend("Nil", Final|Primitive, []Slot {
+		MSlot("copy", func(o *Object) *Object {
+			return o;
+		}),
+		MSlot("toString", func(o *Object) *Object {
+			return Wrap("nil")
+		}),
+	})
+	Nil = &Object{c: NilClass}
+	
+	ObjectClass.e[_Object_type].Set = Nil
+
 	ClassClass.e = []Slot {
 		FSlot("help", False),
 		MSlot("is", func(o, x *Object) *Object {
@@ -727,26 +742,15 @@ func initBaseClasses() {
 		MSlot("copy", func(o *Object) *Object {
 			return o;
 		}),
-		MSlot("name", func(o *Object) *Object {
+		PropSlot("name", func(o *Object) *Object {
 			return Wrap(o.ToClass().n)
-		}),
+		}, Nil),
 		MSlot("names", func(o, flags *Object) *Object {
 			c := o.ToClass()
 			s := flags.ToString()
 			hook := strings.Index(s, "+") != -1
 			deep := strings.Index(s, "*") != -1
 			return Wrap(c.Names(hook, deep))
-		}),
-		MSlot("values", func(o *Object) *Object {
-			c := o.ToClass()
-			res := new(hashObj).init(nil)
-			m := res.hashData()
-			for _, x := range c.e {
-				if x.Vis == Public {
-					m[x.Name] = x.Value
-				}
-			}
-			return res
 		}),
 		MSlot("info", func(o *Object) *Object {
 			c := o.ToClass()
@@ -762,6 +766,8 @@ func initBaseClasses() {
 					fmt.Println(i, e.offset, nm + "()")
 				case Field:
 					fmt.Println(i, e.offset, nm, e.Value)
+				case Property:
+					fmt.Println(i, e.offset, nm)
 				case Marker:
 					fmt.Println(i, "-->", e.next, nm)
 				}
@@ -775,9 +781,9 @@ func initBaseClasses() {
 		MSlot("copy", func(o *Object) *Object {
 			return o;
 		}),
-		MSlot("name", func(a *Object) *Object {
+		PropSlot("name", func(a *Object) *Object {
 			return Wrap(a.accessorData().n)
-		}),
+		}, Nil),
 		MSlot("defined", func(a, o *Object) *Object {
 			return Wrap(o.Defined(a.accessorData()))
 		}),
@@ -866,15 +872,7 @@ func trimString(args []*Object) string {
 }
 
 func initSimpleClasses() {
-	NilClass = ObjectClass.extend("Nil", Final|Primitive, []Slot {
-		MSlot("copy", func(o *Object) *Object {
-			return o;
-		}),
-		MSlot("toString", func(o *Object) *Object {
-			return Wrap("nil")
-		}),
-	})
-	Nil = &Object{c: NilClass}
+	Done = &Object{c: ObjectClass}
 
 	BooleanClass = ObjectClass.extend("Boolean", 0, []Slot {
 		MSlot("copy", func(o *Object) *Object {
@@ -903,46 +901,23 @@ func initSimpleClasses() {
 }
 
 func initDataClasses() {
-	stringIterator = IteratorClass.extend("ArrayIterator", UserData, []Slot {
+	stringIterator = IteratorClass.extend("StringIterator", UserData, []Slot {
 		PSlot("index", 0),
-		PSlot("res", Nil),
 		MSlot("create", func(o, s *Object) *Object {
 			o.SetUserData([]rune(s.ToString()))
 			return Nil
 		}),
-		MSlot("key", func(o *Object) *Object {
-			return stringIterator.Get(o, 0)
-		}),
-		MSlot("value", func(o *Object) *Object {
-			i := stringIterator.Get(o, 0).ToInt()
-			a := o.UserData().([]rune)
-			return Wrap(string(a[i]))
-		}),
 		MSlot("next", func(o *Object) *Object {
 			i := stringIterator.Get(o, 0).ToInt()
 			stringIterator.Set(o, 0, Wrap(i+1))
-			return Nil
-		}),
-		MSlot("done", func(o *Object) *Object {
-			i := stringIterator.Get(o, 0).ToInt()
-			a := o.UserData().([]rune)
-			return Wrap(i >= len(a))
-		}),
-		MSlot("clear", func(o *Object) *Object {
-			stringIterator.Set(o, 1, Wrap([]*Object{}))
-			return Nil			
-		}),
-		MSlot("set", func(o, x *Object) *Object {
-			a := stringIterator.Get(o, 1)
-			ArrayClass.Call(a, 1, x) 
-			return Nil
-		}),
-		MSlot("result", func(o *Object) *Object {
-			a := stringIterator.Get(o, 1)
-			return ArrayClass.Call(a, 0)
+			s := o.UserData().([]rune)
+			if i >= len(s) {
+				return Done
+			}
+			return Wrap(s[i])
 		}),
 	})
-	StringClass = CollectionClass.extend("String", Final|Primitive, []Slot {
+	StringClass = ObjectClass.extend("String", Final|Primitive, []Slot {
 		MSlot("iterate", func(o *Object) *Object {
 			return stringIterator.New(o)
 		}),
@@ -1073,6 +1048,50 @@ func initDataClasses() {
 				panic(fmt.Errorf("bad encoding"))
 			}
 			return Wrap(string(r))
+		}),
+		MSlot("readLine", func(o *Object) *Object {
+			res := ""
+			for {
+				x := StreamClass.Call(o, 3)
+				if x == False {
+					if res == "" {
+						return False
+					}
+					return Wrap(res)
+				}
+				c := x.ToString()
+				if c == "\n" {
+					break
+				}
+				res += c
+			}
+			return Wrap(res)
+		}),
+		MSlot("readUntil", func(o, s *Object) *Object {
+			res := ""
+			until := s.ToString()
+			cur := 0
+			for {
+				x := StreamClass.Call(o, 3)
+				if x == False {
+					if res == "" {
+						return False
+					}
+					return Wrap(res)
+				}
+				c := x.ToString()
+				if strings.HasPrefix(until[cur:], c) {
+					if cur + len(c) >= len(until) {
+						break
+					}
+					cur += len(c)
+				} else if cur == 0 {
+					res += c
+				} else {
+					res += until[:cur] + c
+				}
+			}
+			return Wrap(res)	
 		}),
 		MSlot("writeChar", func(o, r *Object) *Object {
 			buf := []byte{0,0,0,0,0,0}
@@ -1263,134 +1282,29 @@ func setOp(a, b []*Object, op int) (ina, inb, inboth []*Object) {
 	return
 }
 
-func itDone(it *Object) bool {
-	return IteratorClass.Call(it, _Iterator_done) != False
-}
-
-func iterate(col *Object, f func(*Object)) {
-	it := CollectionClass.Call(col, 0)
-	for !itDone(it) {
-		f(it)
-		IteratorClass.Call(it, _Iterator_next)
-	}
-}
-
-func iterateWrite(col *Object, f func(*Object)) *Object {
-	it := CollectionClass.Call(col, 0)
-	IteratorClass.Call(it, _Iterator_clear)
-	for !itDone(it) {
-		f(it)
-		IteratorClass.Call(it, _Iterator_next)
-	}
-	return IteratorClass.Call(it, _Iterator_result)
-}
-
-const (
-	_Iterator_key = iota
-	_Iterator_value
-	_Iterator_next
-	_Iterator_done
-	_Iterator_clear
-	_Iterator_set
-	_Iterator_result
-)
-
 func initCollectionClasses() {
 	IteratorClass = ObjectClass.extend("Iterator", 0, []Slot {
-		AbstractMethod("key"),
-		AbstractMethod("value"),
 		AbstractMethod("next"),
-		AbstractMethod("done"),
-		AbstractMethod("clear"),
-		AbstractMethod("set"),
-		AbstractMethod("result"),
 	})
 	
-	CollectionClass = ObjectClass.extend("Collection", 0, []Slot {
-		AbstractMethod("iterate"),
-		AbstractMethod("__aget__"),
-		AbstractMethod("__aset__"),
-		AbstractMethod("deepEquals"),
-		PropSlot("size", Nil, Nil),
-		MSlot("copy", func(o *Object) *Object {
-			return iterateWrite(o, func(it *Object) {
-				v := IteratorClass.Call(it, _Iterator_value)
-				IteratorClass.Call(it, _Iterator_set, v)
-			})
-		}),
-		MSlot("filter", func(o, f *Object) *Object {
-			return iterateWrite(o, func(it *Object) {
-				v := IteratorClass.Call(it, _Iterator_value)
-				k := IteratorClass.Call(it, _Iterator_key)
-				if f.Call(nil, k, v) != False {
-					IteratorClass.Call(it, _Iterator_set, v)
-				}
-			})
-		}),
-		MSlot("map", func(o, f *Object) *Object {
-			return iterateWrite(o, func(it *Object) {
-				v := IteratorClass.Call(it, _Iterator_value)
-				IteratorClass.Call(it, _Iterator_set, f.Call(nil, v))
-			})
-		}),
-		MSlot("each", func(o, f *Object) *Object {
-			iterate(o, func(it *Object) {
-				k := IteratorClass.Call(it, _Iterator_key)
-				v := IteratorClass.Call(it, _Iterator_value)
-				f.Call(nil, k, v)
-			})
-			return Nil
-		}),
-		MSlot("reduce", func(o, f *Object) *Object {
-			var res *Object
-			iterate(o, func(it *Object) {
-				x := IteratorClass.Call(it, _Iterator_value)
-				res = f.Call(nil, res, x)
-			})
-			return res
-		}),
-	})
-
 	arrayIterator = IteratorClass.extend("ArrayIterator", 0, []Slot {
 		PSlot("array", Nil),
 		PSlot("index", 0),
-		PSlot("res", Nil),
 		MSlot("create", func(o, array *Object) *Object {
 			arrayIterator.Set(o, 0, array)
 			return Nil
 		}),
-		MSlot("key", func(o *Object) *Object {
-			return arrayIterator.Get(o, 1)
-		}),
-		MSlot("value", func(o *Object) *Object {
-			i := arrayIterator.Get(o, 1).ToInt()
-			a := arrayIterator.Get(o, 0).ToArray()
-			return a[i]
-		}),
 		MSlot("next", func(o *Object) *Object {
+			a := arrayIterator.Get(o, 0).ToArray()
 			i := arrayIterator.Get(o, 1).ToInt()
 			arrayIterator.Set(o, 1, Wrap(i+1))
-			return Nil
-		}),
-		MSlot("done", func(o *Object) *Object {
-			i := arrayIterator.Get(o, 1).ToInt()
-			a := arrayIterator.Get(o, 0).ToArray()
-			return Wrap(i >= len(a))
-		}),
-		MSlot("clear", func(o *Object) *Object {
-			arrayIterator.Set(o, 2, Wrap([]*Object{}))
-			return Nil
-		}),
-		MSlot("set", func(o, x *Object) *Object {
-			a := arrayIterator.Get(o, 2)
-			ArrayClass.Call(a, 1, x)
-			return Nil
-		}),
-		MSlot("result", func(o *Object) *Object {
-			return arrayIterator.Get(o, 2)
+			if i >= len(a) {
+				return Done
+			}
+			return a[i]
 		}),
 	})
-	ArrayClass = CollectionClass.extend("Array", Final, []Slot {
+	ArrayClass = ObjectClass.extend("Array", Final, []Slot {
 		MSlot("join", func(o *Object, args []*Object) *Object {
 			if len(args) > 1 {
 				 panic(fmt.Errorf("wrong number of arguments %d", len(args)))
@@ -1525,54 +1439,27 @@ func initCollectionClasses() {
 		PSlot("keys", Nil),
 		PSlot("index", 0),
 		PSlot("hash", Nil),
-		PSlot("res", Nil),
 		MSlot("create", func(o, hash *Object) *Object {
 			keys := HashClass.Call(hash, 0)
 			hashIterator.Set(o, 0, keys)
 			hashIterator.Set(o, 2, hash)
 			return Nil
 		}),
-		MSlot("key", func(o *Object) *Object {
-			a := hashIterator.Get(o, 0).ToArray()
-			i := hashIterator.Get(o, 1).ToInt()
-			return a[i]
-		}),
-		MSlot("value", func(o *Object) *Object {
-			a := hashIterator.Get(o, 0).ToArray()
-			i := hashIterator.Get(o, 1).ToInt()
-			h := hashIterator.Get(o, 2).hashData()
-			return h[keyData(a[i])]
-		}),
 		MSlot("next", func(o *Object) *Object {
+			a := hashIterator.Get(o, 0).ToArray()
 			i := hashIterator.Get(o, 1).ToInt()
+			h := hashIterator.Get(o, 3).ToHash()
 			hashIterator.Set(o, 1, Wrap(i+1))
-			return Nil
-		}),
-		MSlot("done", func(o *Object) *Object {
-			a := hashIterator.Get(o, 0).ToArray()
-			i := hashIterator.Get(o, 1).ToInt()
-			return Wrap(i >= len(a))
-		}),
-		MSlot("clear", func(o *Object) *Object {
-			h := Wrap(map[interface{}] *Object{})
-			hashIterator.Set(o, 3, h)
-			return Nil
-		}),
-		MSlot("set", func(o, x *Object) *Object {
-			a := hashIterator.Get(o, 0).ToArray()
-			i := hashIterator.Get(o, 1).ToInt()
-			h := hashIterator.Get(o, 3).hashData()
-			h[keyData(a[i])] = x
-			return Nil
-		}),
-		MSlot("result", func(o *Object) *Object {
-			return hashIterator.Get(o, 3)
+			if i >= len(a) {
+				return Done
+			}
+			return h[a[i]]
 		}),
 	})
-	HashClass = CollectionClass.extend("Hash", Final, []Slot {
+	HashClass = ObjectClass.extend("Hash", Final, []Slot {
 		MSlot("keys", func(o *Object) *Object {
 			res := []*Object{}
-			for k := range o.hashData() {
+			for k := range o.ToHash() {
 				res = append(res, Wrap(k))
 			}
 			return Wrap(res)
@@ -1586,7 +1473,7 @@ func initCollectionClasses() {
 		MSlot("toString", func(o *Object) *Object {
 			res := "{"
 			start := true
-			for k, v := range o.hashData() {
+			for k, v := range o.ToHash() {
 				if !start {
 					res += ", "
 				}
@@ -1597,18 +1484,18 @@ func initCollectionClasses() {
 			return Wrap(res)
 		}),
 		MSlot("__aget__", func(o, k *Object) *Object {
-			res := o.hashData()[keyData(k)]
+			res := o.ToHash()[keyData(k)]
 			if res == nil {
 				res = False
 			}
 			return res
 		}),
 		MSlot("__aset__", func(o, k, v *Object) *Object {
-			o.hashData()[keyData(k)] = v
+			o.ToHash()[keyData(k)] = v
 			return Nil
 		}),
 		PropSlot("size", func(o *Object) *Object {
-			return Wrap(len(o.hashData()))
+			return Wrap(len(o.ToHash()))
 		}, Nil),
 	})
 }
