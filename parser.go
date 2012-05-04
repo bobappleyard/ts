@@ -182,8 +182,6 @@ var keywords = []string {
 	"class", "new", "this", "super",
 	"private", "public",
 	"package", "export", "import",
-	"loop", "continue", "break",
-	"for", "in", "do",
 }
 
 func checkKeyword(t Token) {

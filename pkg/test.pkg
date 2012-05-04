@@ -14,7 +14,7 @@ package test
 		def opts = flag.parse(new class(flag.Spec)
 			def v = [false, "verbose output"];
 		end); 
-		suites.each(fn(i, x) = runSuite.apply(x));
+		suites.each(runSuite.apply);
 		if msgs.size == 0 then
 			printPass(opts);
 		else
@@ -91,7 +91,7 @@ package test
 	// failure reporting
 	def printFail(opts)
 		if opts.v then
-			msgs.each(fn(i, x) = print(x));
+			msgs.each(print);
 			print("=======SUMMARY=======");
 		end;
 		def pattern = "FAIL: taken: % passed: % failed: %";

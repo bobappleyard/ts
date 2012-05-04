@@ -71,7 +71,7 @@ func bsPkg(itpr *ts.Interpreter) map[string] *ts.Object {
 	})
 	
 	strflags := ts.UserData | ts.Final
-	Stream = ts.StreamClass.Extend(itpr, "Stream", strflags, []ts.Slot {
+	Stream = ts.ObjectClass.Extend(itpr, "Stream", strflags, []ts.Slot {
 		ts.MSlot("readByte", func(o *ts.Object) *ts.Object {
 			buf := []byte{0}
 			r := o.UserData().(io.Reader)

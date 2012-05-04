@@ -88,36 +88,3 @@ def callWithCont(f)
 	throw(e);
 end;
 
-class RangeIterator(Iterator)
-	def create(from, to)
-		this.from = from;
-		this.cur = from;
-		this.to = to;
-	end;
-	def next()
-		if this.to && this.cur > this.to then
-			return done;
-		end;
-		def res = this.cur;
-		this.cur = this.cur + 1;
-		return res;
-	end;
-	def iterate()
-		return this;
-	end;
-	def min get() = this.from;
-	def max get() = this.to;
-	def size get()
-		if this.to then
-			return this.to-this.from;
-		end;
-		return 1/0;
-	end;
-private
-	def from, cur, to;	
-end;
-
-def range(from, to?)
-	return new RangeIterator(from, to);
-end;
-

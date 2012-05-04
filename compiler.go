@@ -14,6 +14,8 @@ import (
 
 *******************************************************************************/
 
+var Strip = false
+
 // Compile a TranScript source file. The results of the compilation can then be
 // saved to a file or executed.
 func (u *Unit) Compile(in io.Reader, f string) {
@@ -144,7 +146,7 @@ func (u *Unit) compileTopLevel(n *Node) {
 
 func (u *Unit) writeSrc(n *Node, e compilerCtx) {
 	t := n.Token
-	if t.Line != 0 {
+	if t.Line != 0 && !Strip {
 		u.file = t.File
 		u.line = t.Line
 		e.write(SOURCE, u.getVal(Wrap(t.File)), u.line)

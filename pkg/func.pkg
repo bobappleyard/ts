@@ -11,32 +11,4 @@ package func
 		end;
 		return fn(args*) = f(g.apply(args));
 	end;
-	
-	def fold(f, i, l)
-		def iter(acc, it)
-			def x = it.next();
-			if x == done then
-				return acc;
-			end;
-			return iter(f(x, acc), it);
-		end;
-		return iter(i, l.iterate());
-	end;
-	
-	def map(f, l)
-		def res = [];
-		fold(fn(x, _) = res.add(f(x)), nil, l);
-		return res;
-	end;
-	
-	def filter(f, l)
-		def res = [];
-		def test(x, _)
-			if f(x) then
-				res.add(x);
-			end;
-		end;
-		fold(test, nil, l);
-		return res;
-	end;
 end;
