@@ -268,9 +268,54 @@ func (c *Class) New(args... *Object) *Object {
 	return c.alloc().callMethod(c.m[_Object_new], args)
 }
 
-// Make objects printable from Go.
+// Implements fmt.Stringer.
 func (o *Object) String() string {
 	return o.callMethod(o.c.m[_Object_toString], nil).ToString()
+}
+
+// Implements io.Reader.
+func (o *Object) Read(b []byte) (n int, err error) {
+	if r, ok := o.UserData().(io.Reader); ok {
+		return r.Read(b)
+	}
+	e := o.c.IndexOf("read")
+	if e == -1 {
+		return 0, Undefined
+	}
+	defer func() {
+		err = recover().(error)
+	}()
+	res := o.c.Call(o, e, Wrap(b))
+	if res == False {
+		return 0, io.EOF
+	}
+	n = res.ToInt()
+	return
+}
+
+// Implements io.Writer.
+func (o *Object) Write(b []byte) (n int, err error) {
+	if r, ok := o.UserData().(io.Writer); ok {
+		return r.Write(b)
+	}
+	e := o.c.IndexOf("write")
+	if e == -1 {
+		return 0, Undefined
+	}
+	defer func() {
+		err = recover().(error)
+	}()
+	res := o.c.Call(o, e, Wrap(b))
+	if res == False {
+		return 0, io.EOF
+	}
+	n = res.ToInt()
+	return
+}
+
+// Implements error.
+func (o *Object) Error() string {
+	return o.String()
 }
 
 // Check to see whether a member is defined on an object.
@@ -478,6 +523,15 @@ func (c *Class) SlotCount() int {
 
 func (c *Class) Slot(i int) Slot {
 	return c.e[i]
+}
+
+func (c *Class) IndexOf(n string) int {
+	for i := range c.e {
+		if c.e[i].Name == n {
+			return i
+		}
+	}
+	return -1
 }
 
 // Within the interpreter class extension is divided up into three phases:

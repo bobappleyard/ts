@@ -2,75 +2,92 @@ package text
 
 	def text = packages["@text"];
 
-	export Stream, Utf8Stream;
+	export Stream, Codec, utf8;
 	
-	class Stream()
-		def readLine()
-			return this.readUntil("\n");
-		end;
-		def readWord()
-			return this.readUntil(" \t\n");
-		end;
-		def readUntil(cs)
-			def c, res = "";
-			def more()
-				c = this.readChar();
-				if !c then
-					if res == "" then
-						return false;
+	def Stream(c, codec)
+		return class(c)
+			def readByte()
+				def b = Buffer(1);
+				if !this.read(b) then
+					return false;
+				end;
+				return b[0];
+			end;
+			def writeByte(x)
+				def b = Buffer(1);
+				b[0] = x;
+				this.write(b);
+			end;
+			def readChar()
+				codec.read(this);
+			end;
+			def writeChar(x)
+				codec.write(this, x);
+			end;
+			def readLine()
+				return this.readUntil("\n");
+			end;
+			def readWord()
+				return this.readUntil(" \t\n");
+			end;
+			def readUntil(cs)
+				def c, res = "";
+				def more()
+					c = this.readChar();
+					if !c then
+						if res == "" then
+							return false;
+						end;
+						return res;
 					end;
-					return res;
+					if cs.contains(c) then
+						return res;
+					end;
+					res = res + c;
+					return more();
 				end;
-				if cs.contains(c) then
-					return res;
-				end;
-				res = res + c;
 				return more();
 			end;
-			return more();
-		end;
-		def readUntilWord(word)
-			def c, res = "", match = "";
-			def more()
-				c = this.readChar();
-				if !c then
-					res = res + match;
-					if res == "" then
-						return false;
+			def readUntilWord(word)
+				def c, res = "", match = "";
+				def more()
+					c = this.readChar();
+					if !c then
+						res = res + match;
+						if res == "" then
+							return false;
+						end;
+						return res;
 					end;
-					return res;
+					match = match + c;
+					if !word.startsWith(match) then
+						res = res + match;
+						match = "";
+					end;
+					if match.size == word.size then
+						return res;
+					end;
+					return more();
 				end;
-				match = match + c;
-				if !word.startsWith(match) then
-					res = res + match;
-					match = "";
-				end;
-				if match.size == word.size then
-					return res;
-				end;
-				return more();
+				return more();			
 			end;
-			return more();			
-		end;
-		def writeString(s)
-			s.split().each(this.writeChar);
+			def writeString(s)
+				s.split().each(this.writeChar);
+			end;
 		end;
 	end;
 	
-	class Utf8Stream(Stream)
-		def create(s)
-			this.src = s;
+	class Codec()
+		def create(read, write)
+			this.r = read;
+			this.w = write;
 		end;
-
-		def readByte() = this.src.readByte();
-		def writeByte(b) = this.src.writeByte(b);
-		def seek(from, by) = this.src.seek(from, by);
-		def close() = this.src.close();
-
-		def readChar() = text.read8(this);
-		def writeChar(c) = text.write8(this, c);
+		def read(src) = this.r(src),
+		    write(dst, x) = this.w(src, x);
 	private
-		def src;
+		def r, w;
 	end;
+	
+	def utf8 = Codec(read8, write8);
 
 end;
