@@ -23,7 +23,7 @@ var ObjectClass *Class
 // do not work on these classes.
 var ClassClass, AccessorClass, NilClass, BooleanClass, TrueClass, FalseClass,
     StringClass, NumberClass, IntClass, FltClass, FunctionClass, ArrayClass,
-    HashClass, CollectionClass, ErrorClass,
+    HashClass, CollectionClass, ErrorClass, BufferClass,
     frameClass, skeletonClass, boxClass, undefinedClass *Class
 
 // Built in values.
@@ -92,6 +92,8 @@ func Wrap(x interface{}) *Object {
 		return new(fltObj).init(v)
 	case string:
 		return new(strObj).init(v)
+	case []byte:
+		return new(bufObj).init(v)
 	case []*Object:
 		return new(arrObj).init(v)
 	case []int:
@@ -254,6 +256,11 @@ func (o *Object) ToHash() map[interface{}] *Object {
 	return (*hashObj)(unsafe.Pointer(o)).d
 }
 
+func (o *Object) ToBuffer() []byte {
+	o.checkClass(o.c == BufferClass)
+	return (*bufObj)(unsafe.Pointer(o)).d
+}
+
 func (o *Object) UserData() interface{} {
 	o.checkClass(o.c.flags & UserData != 0)
 	return (*userObj)(unsafe.Pointer(o)).d
@@ -352,7 +359,7 @@ func definePrimitives(i *Interpreter) {
 		ObjectClass, ClassClass, FunctionClass, AccessorClass,
 		BooleanClass, TrueClass, FalseClass, NilClass,
 		NumberClass, IntClass, FltClass,
-		StringClass, ArrayClass, HashClass, 
+		StringClass, ArrayClass, HashClass, BufferClass,
 		pmClass, pkgClass,
 		ErrorClass,
 	}
@@ -539,6 +546,17 @@ func (o *hashObj) init(m map[interface{}] *Object) *Object {
 	if o.d == nil {
 		o.d = make(map[interface{}] *Object)
 	}
+	return (*Object)(unsafe.Pointer(o))
+}
+
+type bufObj struct {
+	Object
+	d []byte
+}
+
+func (o *bufObj) init(x []byte) *Object {
+	o.c = BufferClass
+	o.d = x
 	return (*Object)(unsafe.Pointer(o))
 }
 
@@ -1403,6 +1421,16 @@ func initCollectionClasses() {
 		}),
 		PropSlot("size", func(o *Object) *Object {
 			return Wrap(len(o.ToHash()))
+		}, Nil),
+	})
+	
+	BufferClass = ObjectClass.extend("Buffer", Final, []Slot {
+		MSlot("__new__", func(o, s *Object) *Object {
+			buf := make([]byte, s.ToInt())
+			return new(bufObj).init(buf)
+		}),
+		PropSlot("size", func(o *Object) *Object {
+			return Wrap(len(o.ToBuffer()))
 		}, Nil),
 	})
 }
