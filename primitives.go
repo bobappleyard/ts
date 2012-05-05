@@ -106,6 +106,12 @@ func Wrap(x interface{}) *Object {
 			res[i] = Wrap(x)
 		}
 		return Wrap(res)
+	case []interface{}:
+		res := make([]*Object, len(v))
+		for i, x := range v {
+			res[i] = Wrap(x)
+		}
+		return Wrap(res)
 	case map[*Object] *Object:
 		if v == nil {
 			return Nil
@@ -1306,6 +1312,12 @@ func initCollectionClasses() {
 			}
 			return Wrap(res)
 		}),
+		MSlot("reduce", func(o, f, acc *Object) *Object {
+			for _, x := range o.ToArray() {
+				acc = f.Call(nil, x, acc)
+			}
+			return acc
+		}),
 		MSlot("filter", func(o, f *Object) *Object {
 			a := o.ToArray()
 			res := make([]*Object, 0, len(a))
@@ -1316,6 +1328,27 @@ func initCollectionClasses() {
 			}
 			return Wrap(res)
 		}),
+		MSlot("zip", func(o *Object) *Object {
+			as := [][]*Object{}
+			l := -1
+			for _, x := range o.ToArray() {
+				a := x.ToArray()
+				as = append(as, a)
+				m := len(a)
+				if l == -1 || m < l {
+					l = m
+				}
+			}
+			res := make([]*Object, l)
+			for i := 0; i < l; i++ {
+				b := make([]*Object, len(as))
+				for j, a := range as {
+					b[j] = a[i]
+				}
+				res[i] = Wrap(b)
+			}
+			return Wrap(res)
+		}),		
 		MSlot("__aget__", func(o, i *Object) *Object {
 			return o.ToArray()[i.ToInt()]
 		}),
