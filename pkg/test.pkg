@@ -11,9 +11,9 @@ package test
 	
 	// run all the test suites and report how they went
 	def run()
-		def opts = flag.parse(new class(flag.Spec)
+		def opts = flag.parse(class(flag.Spec)
 			def v = [false, "verbose output"];
-		end); 
+		end()); 
 		suites.each(runSuite.apply);
 		if msgs.size == 0 then
 			printPass(opts);

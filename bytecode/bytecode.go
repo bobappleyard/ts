@@ -29,7 +29,6 @@ const (
 	EXTEND
 	EXTENDA
 	FINISH
-	NEW
 	GET
 	GETM
 	SET

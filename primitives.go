@@ -753,6 +753,9 @@ func initBaseClasses() {
 
 	ClassClass.e = []Slot {
 		FSlot("help", False),
+		MSlot("__call__", func(o *Object, args []*Object) *Object {
+			return o.ToClass().New(args...)
+		}),
 		MSlot("is", func(o, x *Object) *Object {
 			c := o.ToClass()
 			d := o.ToClass()

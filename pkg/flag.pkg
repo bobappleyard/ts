@@ -8,7 +8,7 @@ package flag
 	
 	def printUsage = fn(spec)
 		spec.type.names("").each(fn(x)
-			def s = new Accessor(x).get(spec);
+			def s = Accessor(x).get(spec);
 			print("-%: %".subst(x, s[1]));
 		end);
 		print("-help: display this help");
@@ -22,7 +22,7 @@ package flag
 	def parse(spec)
 		def res = spec.copy(), inOpts = true;
 		res.type.names("").each(fn(x)
-			new Accessor(x).set(res, false);
+			Accessor(x).set(res, false);
 		end);
 		def step(i)
 			if i < system.args.size && system.args[i].startsWith("-") then
@@ -31,7 +31,7 @@ package flag
 					print("malformed option");
 					fail(spec);
 				end;
-				def a = new Accessor(opt.slice(1).join());
+				def a = Accessor(opt.slice(1).join());
 				if a.name() == "help" then
 					printUsage(spec);
 					exit();

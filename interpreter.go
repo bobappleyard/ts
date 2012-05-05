@@ -974,11 +974,6 @@ func (p *process) step() {
 		n := p.next()
 		p.finish(n)
 		
-	case NEW:
-		c := p.v.ToClass()
-		p.t = c.alloc()
-		p.v = c.m[_Object_new]
-		
 	case GET:
 		n, m := p.next(), p.next()
 		a := p.u.a[n]

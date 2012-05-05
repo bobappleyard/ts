@@ -76,7 +76,6 @@ const (
 	lookNode
 	thisNode
 	superNode
-	newNode
 	nodeCount
 )
 
@@ -97,7 +96,6 @@ var nodeNames = []string {
 	"look",
 	"this",
 	"super",
-	"new",
 }
 
 type compilerCtx struct {
@@ -194,8 +192,6 @@ func (u *Unit) compileNode(n *Node, e compilerCtx) {
 		e.write(THIS)
 	case superNode:
 		panic(Unexpected(n.Token))
-	case newNode:
-		u.compileNew(n, e)
 	default:
 		panic(fmt.Errorf("unknown AST kind: %d", n.Kind))
 	}
@@ -734,10 +730,4 @@ func (u *Unit) compileLook(n *Node, e compilerCtx) {
 	e.write(GET, u.getAccessor(t.Text), e.static(t.Text))
 }
 
-func (u *Unit) compileNew(n *Node, e compilerCtx) {
-	u.compileCall(n, func() {
-		u.compileNode(n.Child[0], e)
-		e.write(NEW)
-	}, e)
-}
 

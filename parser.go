@@ -179,7 +179,7 @@ var keywords = []string {
 	"true", "false", "nil",
 	"def",
 	"fn", "return", "end", 
-	"class", "new", "this", "super",
+	"class", "this", "super",
 	"private", "public",
 	"package", "export", "import",
 }
@@ -484,7 +484,7 @@ type arrParser struct { p int }
 
 func (q arrParser) Prefix(p *Parser, l *Lexer, t Token) *Node {
 	avar := tNode(varNode, "@tmp")
-	nn := &Node{Kind: newNode, Token: t}
+	nn := &Node{Kind: callNode, Token: t}
 	def := kNode(defNode).Add(kNode(varNode).Add(
 		avar,
 		nn.Add(tNode(varNode, "Array"), vNode(0)),
@@ -531,7 +531,7 @@ func transHash(n *Node) *Node {
 	fn := kNode(fnNode).Add(new(Node))
 	fn.Add(kNode(defNode).Add(kNode(varNode).Add(
 		avar,
-		kNode(newNode).Add(tNode(varNode, "Hash")),
+		kNode(callNode).Add(tNode(varNode, "Hash")),
 	)))
 	for _, x := range n.Child {
 		fn.Add(kNode(mutNode).Add(
@@ -545,23 +545,6 @@ func transHash(n *Node) *Node {
 
 // objects
 type objParser struct { p int }
-
-func (q objParser) Prefix(p *Parser, l *Lexer, t Token) *Node {
-	n := kNode(newNode)
-	n.Token = t
-	if l.Lookahead().Text == "class" {
-		l.Next()
-		n.Add(parseClass(l, nil, nil))
-	} else {
-		n.Add(p.Parse(l, 109))
-		Expect("(", l.Next())
-		parseList(l, n, ")", func() *Node {
-			return p.Parse(l, 0)
-		})
-		Expect(")", l.Next())
-	}
-	return n
-}
 
 func (q objParser) Precedence(t Token) int {
 	return q.p
@@ -713,7 +696,7 @@ func transPkg(n *Node) *Node {
 	// package internal runs inside a block
 	fn := kNode(fnNode).Add(new(Node))
 	fn.Add(n.Child[2:]...)
-	fn.Add(kNode(retNode).Add(kNode(newNode).Add(pc, vNode(nm))))
+	fn.Add(kNode(retNode).Add(kNode(callNode).Add(pc, vNode(nm))))
 	return kNode(mutNode).Add(pl, kNode(callNode).Add(fn))
 }
 
@@ -794,7 +777,6 @@ func init() {
 	expr.RegPrefix(id, "super", bip)
 	
 	objs := objParser{120}
-	expr.RegPrefix(id, "new", objs)
 	expr.RegInfix(literal, ".", objs)
 	expr.RegPrefix(id, "class", ParserFunc(parseAnonClass))
 

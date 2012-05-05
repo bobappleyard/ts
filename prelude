@@ -64,7 +64,7 @@ end;
 // continuations, these continuations are not valid after callWithCont()
 // returns.
 def callWithCont(f)
-	def key = new Object(),
+	def key = Object(),
 	    followed = false,
 	    res;
 	def e = catch(fn()
