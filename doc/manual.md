@@ -1,9 +1,17 @@
-Introduction
-============
+TranScript Manual
+=================
 
 TranScript is a dynamic object oriented language. It is designed to avoid some
 of the major shortcomings of existing dynamic languages, particularly with
 respect to performance.
+
+Contents
+========
+
+* [Getting Started](#getting-started) 
+* [Using The Interpreter](#using-the-interpreter)
+* [The TranScript Language](#the-transcript-language)
+* [The TranScript Library](#the-transcript-library)
 
 Getting Started
 ===============
