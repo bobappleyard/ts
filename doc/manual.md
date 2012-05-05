@@ -514,6 +514,18 @@ Throw an error.
 Catch an error: Call `thk`. If an error is thrown while `thk` is executing, 
 return it. Otherwise return `false`.
 
+Classes
+-------
+
+This is a list of built-in classes.
+
+* [Object](#object)
+* [Function](#function)
+* [Number](#number)
+* [String](#string)
+* [Array](#array)
+* [Hash](#hash)
+
 Object
 -------
 
