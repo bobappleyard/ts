@@ -418,7 +418,6 @@ func definePrimitives(i *Interpreter) {
 	}))
 	
 	i.Define("read", Wrap(func(o *Object) *Object {
-		
 		return Wrap(readString(os.Stdin, '\n'))
 	}))
 	

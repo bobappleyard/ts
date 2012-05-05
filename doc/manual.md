@@ -493,23 +493,23 @@ the basic behaviour of the language.
 Before discussing the built-in classes, there are some toplevel functions
 defined by the runtime. Many of these will disappear with time.
 
-	print(x...)
+* **print(x...)
 
 Print 0 or more objects to standard output.
 
-	read()
+* **read()
 
 Read a line from standard input.
 
-	exit(code)	
+* **exit(code)	
 
 Exit the process with the given code.
 
-	throw(x)	
+* **throw(x)	
 
 Throw an error.
 
-	catch(thk)	
+* **catch(thk)	
 
 Catch an error: Call `thk`. If an error is thrown while `thk` is executing, 
 return it. Otherwise return `false`.
@@ -531,19 +531,19 @@ Object
 
 The root class. All objects instantiate Object.
 
-	copy()	
+* **copy()	
 
 Creates a copy of the object.
 
-	toString()	
+* **toString()	
 
 The default method for string conversion/printing.
 
-	is(c)	
+* **is(c)	
 
 Test whether the object instantiates class `c`.
 
-	type()	
+* **type()	
 
 The object's class.
 
@@ -552,7 +552,7 @@ Function
 
 *final, primitive*
 
-	apply(args)	
+* **apply(args)	
 
 Call the function, passing `args`, which should be an array containing the
 intended arguments to the function.
@@ -561,15 +561,15 @@ CLASS
 
 *final, primitive*
 
-	name()	
+* **name()	
 
 Returns the name of the class in question.
 
-	names()	
+* **names()	
 
 Returns the names of members this class defines.
 
-	allNames()	
+* **allNames()	
 
 Returns all the defined members. That is, it includes members defined in all
   of the class' ancestors.
@@ -583,11 +583,11 @@ There are two classes which descend from `Number`, `Integer` and `Float`. These
 have the same interface as `Number` but actually implement it. `Number` is,
 itself, absolutely useless.
 
-	toInt()	
+* **toInt()	
 
 Convert the number to an integer.
 
-	toFloat()	
+* **toFloat()	
 
 Convert the number to a float.
 
@@ -596,11 +596,11 @@ String
 
 *final, primitive*
 
-	length()	
+* **length()	
 
 Returns the number of characters in the string.
 
-	split(sep?)	
+* **split(sep?)	
 
 Returns an array of substrings. If called with no parameters or the parameter
 is an empty string, each substring represents a character from the string.
@@ -613,59 +613,59 @@ e.g.
 
 Parses a csv file.
 
-	subst(args*)	
+* **subst(args*)	
 
 Returns a string where occurrences of `%` are replaced with the corresponding
 argument.
 
-	toInt()	
+* **toInt()	
 
 Convert the string to an integer.
 
-	toFloat()	
+* **toFloat()	
 
 Convert the string to a float.
 
-	toNumber()	
+* **toNumber()	
 
 Convert the string to a number.
 
-	startsWith(s)	
+* **startsWith(s)	
 
 Does the string start with `s`?
 
-	endsWith(s)	
+* **endsWith(s)	
 
 Does the string end with `s`?
 
-	contains(s)	
+* **contains(s)	
 
 Does the string contain `s`?
 
-	match(e)	
+* **match(e)	
 
 Does the string match the regular expression `e`?
 
-	trim(s?)	
+* **trim(s?)	
 
 Remove any characters in `s` from the beginning and end of the string. If no 
 parameter is provided, default to whitespace characters.
 
-	trimLeft(s?)	
+* **trimLeft(s?)	
 
 Remove any characters in `s` from the beginning of the string. If no parameter 
 is provided, default to whitespace characters.
 
-	trimRight(s?)	
+* **trimRight(s?)	
 
 Remove any characters in `s` from the end of the string. If no parameter is 
 provided, default to whitespace characters.
 
-	quote()	
+* **quote()	
 
 Returns the quoted representation of the string.
 
-	unquote()	
+* **unquote()	
 
 Given the string is a quoted representation, return the string that it 
 represents.
@@ -675,43 +675,43 @@ Array
 
 *final*
 
-	length()	
+* **length()	
 
 Returns the number of items in the array.
 
-	add(x*)	
+* **add(x*)	
 
 Adds an item to the array.
 
-	remove(x)	
+* **remove(x)	
 
 Removes all instances of an item from the array.
 
-	insert(i, x)	
+* **insert(i, x)	
 
 Inserts an item to the array at the given index.
 
-	delete(i)	
+* **delete(i)	
 
 Deletes an item to the array with the given index.
 
-	slice(from?, to?)	
+* **slice(from?, to?)	
 
 Returns a section of the array starting at `from` and ending on the element
 before `to`. This is an array that shares structure with the original array,
 so changes to one are reflected in the other.
 
-	each(f)	
+* **each(f)	
 
 Calls `f` on every item in the array, passing in the index followed by the
 item.
 
-	filter(f)	
+* **filter(f)	
 
 Returns an array containing all the elements for which a call to `f` returns
 a true value (anything but `false`).
 
-	map(f)	
+* **map(f)	
 
 Returns an array containing all the return values of calling `f` on each item
 in the current array, in order.  
@@ -732,7 +732,7 @@ in the current array, in order.
 Apply `f` to every item in the array, passing the return value of the previous 
 call into the next call. 
 
-	join(sep?)	
+* **join(sep?)	
 
 Given an array of strings, return a single string consisting of each item in
 the array concatenated together, separated with `sep` (or "" if the parameter
@@ -743,17 +743,9 @@ Hash
 
 *final*
 
-	keys()	
+* **keys()	
 
 Return all the keys on this hash.
 
-	each(f)	
 
-Calls `f` on every item in the hash, passing in the key followed by the item.
-
-	map(f)
-
-Returns a map containing all the return values of calling `f` on each item in
-the map.
-
-
+s
