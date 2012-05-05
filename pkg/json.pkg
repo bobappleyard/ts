@@ -1,0 +1,43 @@
+package json
+	export /*readJson, writeJson,*/ string;
+	
+	import data;
+	
+	def toJson = Accessor("toJson");
+	
+	def string(x)
+		if x == nil then
+			return "null";
+		elif x.is(String) then
+			return x.quote();
+		elif x.is(Boolean) || x.is(Number) then
+			return x.toString();
+		elif x.is(Array) then 
+			return "[" + x.map(string).join(",") + "]";
+		elif x.is(Hash) then
+			return "{" 
+			        + x.keys()
+			           .map(fn(k) = k.quote() + ":" + string(x[k]))
+			           .join(",") 
+			     + "}";
+		elif x.is(Function) || x.is(Class) then
+			throw(Error("bad type"));
+		elif toJson.defined(x) then
+			return x.toJson();
+		else
+			def build(a) = a.name.unquote + ":" + string(a.get(x));
+			def res = "{" 
+			           + x.type.names("")
+			                   .map(Accessor)
+			                   .filter(fn(a) = a.property(x))
+			                   .map(build)
+			                   .join(",")
+			        + "}";
+			if res == "{}" then
+				throw(Error("bad type"));
+			end;
+			return res;
+		end;
+	end;
+	
+end;

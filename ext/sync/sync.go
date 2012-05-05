@@ -6,10 +6,10 @@ import (
 )
 
 func init() {
-	ts.PrimitivePackage("sync", syncPkg)
+	ts.RegisterExtension("sync", pkg)
 }
 
-func syncPkg(itpr *ts.Interpreter) map[string] *ts.Object {
+func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
 	MutexClass := ts.ObjectClass.Extend(itpr, "Mutex", ts.UserData, []ts.Slot {
 		ts.MSlot("create", func(o *ts.Object) *ts.Object {
 			o.SetUserData(new(sync.Mutex))

@@ -238,7 +238,10 @@ func parseBlock(l *Lexer, n *Node) {
 
 // eof
 func parseEof(p *Parser, l *Lexer, t Token) *Node {
-	panic(fmt.Errorf("unexpected eof"))
+	e := ErrorClass.New(Wrap("unexpected eof"))
+	ErrorClass.Set(e, 1, Wrap(t.File))
+	ErrorClass.Set(e, 2, Wrap(t.Line))
+	panic(e)
 }
 
 // operators
@@ -713,7 +716,7 @@ func transDotted(x *Node) (string, string) {
 	nm, loc := x.Token.Text, x.Token.Text
 	for _, y := range x.Child {
 		nm = y.Token.Text
-		loc += "/" + nm
+		loc += "." + nm
 	}
 	return nm, loc
 }

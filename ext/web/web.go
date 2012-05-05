@@ -7,10 +7,11 @@ import (
 	"net/http"
 	"net/url"
 	"github.com/bobappleyard/ts"
+	_ "github.com/bobappleyard/ts/ext/system"
 )
 
 func init() {
-	ts.PrimitivePackage("@web", webPkg)
+	ts.RegisterExtension("@web", pkg)
 }
 
 func inputVars(r *http.Request) *ts.Object {
@@ -22,7 +23,7 @@ func inputVars(r *http.Request) *ts.Object {
 	return ts.Wrap(vars)
 }
 
-func webPkg(itpr *ts.Interpreter) map[string] *ts.Object {
+func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
 	FileClass := itpr.Import("system").Get(itpr.Accessor("File")).ToClass()
 
 	handle := func(w http.ResponseWriter, r *http.Request, resp *ts.Object) {

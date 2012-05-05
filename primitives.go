@@ -35,6 +35,27 @@ func init() {
 	initNumberClasses()
 	initCollectionClasses()
 	initDataClasses()
+	initCache()
+}
+
+// cache what are likely to be frequently used values
+var intCache [1024]*Object
+var strCache [128]*Object
+
+func initCache() {
+	for i := 0; i < 1024; i++ {
+		intCache[i] = new(intObj).init(i)
+	}
+	for i := 0; i < 128; i++ {
+		strCache[i] = new(strObj).init(string(i))
+	}
+}
+
+func wrapInt(x int) *Object {
+	if x < 1024 {
+		return intCache[x]
+	}
+	return new(intObj).init(x)
 }
 
 // Given a bool, number, string, slice or map return an object corresponding to 
@@ -69,28 +90,31 @@ func Wrap(x interface{}) *Object {
 		}
 		return False
 	case int8:
-		return new(intObj).init(int(v))
+		return wrapInt(int(v))
 	case uint8:
-		return new(intObj).init(int(v))
+		return wrapInt(int(v))
 	case int16:
-		return new(intObj).init(int(v))
+		return wrapInt(int(v))
 	case uint16:
-		return new(intObj).init(int(v))
+		return wrapInt(int(v))
 	case int32:
-		return new(intObj).init(int(v))
+		return wrapInt(int(v))
 	case uint32:
-		return new(intObj).init(int(v))
+		return wrapInt(int(v))
 	case int64:
-		return new(intObj).init(int(v))
+		return wrapInt(int(v))
 	case uint64:
-		return new(intObj).init(int(v))
+		return wrapInt(int(v))
 	case int:
-		return new(intObj).init(v)
+		return wrapInt(v)
 	case float32:
 		return new(fltObj).init(float64(v))
 	case float64:
 		return new(fltObj).init(v)
 	case string:
+		if len(v) == 1 {
+			return strCache[v[0]]
+		}
 		return new(strObj).init(v)
 	case []byte:
 		return new(bufObj).init(v)
@@ -271,23 +295,21 @@ func (o *Object) SetUserData(x interface{}) {
 	(*userObj)(unsafe.Pointer(o)).d = x
 }
 
-var extensions = map[string] func(*Interpreter) {}
+var extensions = map[string] func(*Interpreter) map[string] *Object{}
 
 // Inform the system about an extension to the language.
-func RegisterExtension(n string, f func(*Interpreter)) {
+func RegisterExtension(n string, f func(*Interpreter) map[string] *Object) {
 	extensions[n] = f
 }
 
-func PrimitivePackage(n string, f func(*Interpreter) map[string] *Object) {
-	RegisterExtension(n, func(itpr *Interpreter) {
-		es := []Slot{}
-		for k, v := range f(itpr) {
-			es = append(es, Slot{Name: k, Kind: Field, Vis: Public, Value: v})
-		}
-		pkg := itpr.Get("Package").ToClass().Extend(itpr, "Package", 0, es)
-		aset := itpr.Accessor("__aset__")
-		itpr.Get("packages").Call(aset, Wrap(n), pkg.New(Wrap(n)))
-	})
+func loadExtension(n string,
+                    f func(*Interpreter) map[string] *Object,
+                    itpr *Interpreter) *Object {
+	es := []Slot{}
+	for k, v := range f(itpr) {
+		es = append(es, Slot{Name: k, Kind: Field, Vis: Public, Value: v})
+	}
+	return itpr.Get("Package").ToClass().Extend(itpr, n, 0, es).New(Wrap(n))
 }
 
 const (
@@ -308,7 +330,7 @@ func root() string {
 
 // registration function called by New()
 func definePrimitives(i *Interpreter) {
-	path := i.Accessor("path")
+	pathField := i.Accessor("path")
 	loaded := map[string] *Object{}
 	pmClass := ObjectClass.extend("PackageManager", 0, []Slot {
 		FSlot("path", root() + "/pkg"),
@@ -327,10 +349,11 @@ func definePrimitives(i *Interpreter) {
 			}
 			// defined as an extension
 			if f := extensions[name]; f != nil {
-				f(i)
+				loaded[name] = loadExtension(name, f, i)
 			} else {
 			// written in TranScript
-				i.Load(o.Get(path).ToString() + "/" +  name + ".pkg")
+				path := strings.Replace(name, ".", "/", -1)
+				i.Load(o.Get(pathField).ToString() + "/" +  path + ".pkg")
 			}
 			if pkg := loaded[name]; pkg != nil {
 				return pkg
@@ -395,6 +418,7 @@ func definePrimitives(i *Interpreter) {
 	}))
 	
 	i.Define("read", Wrap(func(o *Object) *Object {
+		
 		return Wrap(readString(os.Stdin, '\n'))
 	}))
 	
@@ -811,6 +835,20 @@ func initBaseClasses() {
 		}, Nil),
 		MSlot("defined", func(a, o *Object) *Object {
 			return Wrap(o.Defined(a.accessorData()))
+		}),
+		MSlot("property", func(a, o *Object) *Object {
+			e := a.accessorData().lookup(o)
+			if e == nil {
+				return False
+			}
+			return Wrap(e.Kind == Field || e.Kind == Property)
+		}),
+		MSlot("method", func(a, o *Object) *Object {
+			e := a.accessorData().lookup(o)
+			if e == nil {
+				return False
+			}
+			return Wrap(e.Kind == Method)
 		}),
 		MSlot("get", func(a, o *Object) *Object {
 			return o.Get(a.accessorData())
@@ -1435,6 +1473,40 @@ func initCollectionClasses() {
 		PropSlot("size", func(o *Object) *Object {
 			return Wrap(len(o.ToBuffer()))
 		}, Nil),
+		MSlot("slice", func(o *Object, args []*Object) *Object {
+			t := o.ToBuffer()
+			from := 0
+			to := len(t)
+			switch len(args) {
+			case 2:
+				to = args[1].ToInt()
+				fallthrough
+			case 1:
+				from = args[0].ToInt()
+			case 0:
+			default:
+				 panic(fmt.Errorf("wrong number of arguments %d", len(args)))
+			}
+			return Wrap(t[from:to])
+		}),
+		MSlot("copy", func(a, b *Object) *Object {
+			copy(a.ToBuffer(), b.ToBuffer())
+			return Nil
+		}),		
+		MSlot("__aget__", func(o, i *Object) *Object {
+			return Wrap(o.ToBuffer()[i.ToInt()])
+		}),
+		MSlot("__aset__", func(o, i, x *Object) *Object {
+			o.ToBuffer()[i.ToInt()] = byte(x.ToInt())
+			return Nil
+		}),
+		MSlot("__add__", func(a, b *Object) *Object {
+			bufa, bufb := a.ToBuffer(), b.ToBuffer()
+			res := make([]byte, len(bufa) + len(bufb))
+			copy(res, bufa)
+			copy(res[len(bufa):], bufb)
+			return Wrap(res)
+		}),
 	})
 }
 

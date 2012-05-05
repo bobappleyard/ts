@@ -1,0 +1,69 @@
+package data
+	export Codec, Mixin, Stream, Translation,
+	       readAll, copyStream;
+	
+	class Codec()
+		def create(read, write)
+			this.r = read;
+			this.w = write;
+		end;
+		def read(src) = this.r(src),
+		    write(dst, x) = this.w(src, x);
+	private
+		def r, w;
+	end;
+
+	def Mixin(codec, c) = class(c)
+		def readByte()
+			def b = Buffer(1);
+			if !this.readBuffer(b) then
+				return false;
+			end;
+			return b[0];
+		end;
+		def writeByte(x)
+			def b = Buffer(1);
+			b[0] = x;
+			this.writeBuffer(b);
+		end;
+		def read()
+			return codec.read(this);
+		end;
+		def write(x)
+			return codec.write(this, x);
+		end;
+	end;
+	
+	def Stream(s, codec) = Stream(codec, class()
+		def readBuffer(buf) = s.readBuffer(buf);
+		def writeBuffer(buf) = s.writeBuffer(buf);
+	end)();
+	
+	def BLOCK_SIZE = 1024;
+	
+	def readAll(s)
+		def res = Buffer(0);
+		def more()
+			def b = Buffer(BLOCK_SIZE);
+			def n = s.readBuffer(b); 
+			if n == BLOCK_SIZE then
+				res = res + b;
+				return more();
+			end;
+			return res + b.slice(0, n);
+		end;
+		return more();
+	end;
+	
+	def copyStream(a, b)
+		def more()
+			def c = a.readByte();
+			if c then
+				b.writeByte();
+				return more();
+			end;
+		end;
+		return more();
+	end;
+	
+end;

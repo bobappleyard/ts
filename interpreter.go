@@ -166,7 +166,7 @@ func (i *Interpreter) Repl() {
 				readline.AddHistory(l.Scanned())
 				x := i.Exec(u)
 				if x != Nil {
-					fmt.Println(x)
+					fmt.Printf("\033[36m%s\033[0m\n", x)
 				}
 			}
 			return false
@@ -278,7 +278,7 @@ func (o *Object) Read(b []byte) (n int, err error) {
 	if r, ok := o.UserData().(io.Reader); ok {
 		return r.Read(b)
 	}
-	e := o.c.IndexOf("read")
+	e := o.c.IndexOf("readBuffer")
 	if e == -1 {
 		return 0, Undefined
 	}
@@ -298,7 +298,7 @@ func (o *Object) Write(b []byte) (n int, err error) {
 	if r, ok := o.UserData().(io.Writer); ok {
 		return r.Write(b)
 	}
-	e := o.c.IndexOf("write")
+	e := o.c.IndexOf("writeBuffer")
 	if e == -1 {
 		return 0, Undefined
 	}
@@ -649,6 +649,18 @@ func (c *Class) alloc() *Object {
 	return &Object{c: c, f: f}
 }
 
+func (c *Class) FlagSet(f int) bool {
+	return c.flags & f != 0
+}
+
+func (c *Class) SetFlag(f int) {
+	c.flags |= f
+}
+
+func (c *Class) UnsetFlag(f int) {
+	c.flags &= ^f
+}
+
 /*******************************************************************************
 
 	Accessors
@@ -676,8 +688,8 @@ func (a *Accessor) Name() string {
 	return a.n
 }
 
-// Find the entry for the corresponding static and dynamic classes. Returns that
-// entry or nil if no entry can be found.
+// Find the entry for the corresponding object. Returns that entry or nil if no 
+// entry can be found.
 func (a *Accessor) lookup(o *Object) *Slot {
 	c := o.c
 	for i := range a.e {

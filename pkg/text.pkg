@@ -1,93 +1,78 @@
 package text
-
-	def text = packages["@text"];
-
-	export Stream, Codec, utf8;
+	import data;
 	
-	def Stream(c, codec)
-		return class(c)
-			def readByte()
-				def b = Buffer(1);
-				if !this.read(b) then
+	export utf8,
+	       read, print,
+	       writeString, readAll, readWord,
+	       readUntil, readUntilWord;
+	
+
+	def codecs = packages["@text"];
+
+	def utf8 = data.Codec(codecs.read8, codecs.write8);
+
+	def read(s) = readUntil(s, "\n");
+	def print(s, fmt, args*) = writeString(s, fmt.subs.apply(args));
+	def writeString(s, txt) = txt.each(s.write);
+	
+	def readAll(s)
+		def res = "";
+		def more()
+			def c = s.read();
+			if !c then
+				return res;
+			end;
+			res = res + c;
+			return more();
+		end;
+		return more();
+	end;
+
+	def readWord(s)
+		return readUntil(s, " \t\n.\",:;()[]{}/\\&!~-?|");
+	end;
+
+	def readUntil(s, cs)
+		def c, res = "";
+		def more()
+			c = s.read();
+			if !c then
+				if res == "" then
 					return false;
 				end;
-				return b[0];
+				return res;
 			end;
-			def writeByte(x)
-				def b = Buffer(1);
-				b[0] = x;
-				this.write(b);
+			if cs.contains(c) then
+				return res;
 			end;
-			def readChar()
-				codec.read(this);
-			end;
-			def writeChar(x)
-				codec.write(this, x);
-			end;
-			def readLine()
-				return this.readUntil("\n");
-			end;
-			def readWord()
-				return this.readUntil(" \t\n");
-			end;
-			def readUntil(cs)
-				def c, res = "";
-				def more()
-					c = this.readChar();
-					if !c then
-						if res == "" then
-							return false;
-						end;
-						return res;
-					end;
-					if cs.contains(c) then
-						return res;
-					end;
-					res = res + c;
-					return more();
-				end;
-				return more();
-			end;
-			def readUntilWord(word)
-				def c, res = "", match = "";
-				def more()
-					c = this.readChar();
-					if !c then
-						res = res + match;
-						if res == "" then
-							return false;
-						end;
-						return res;
-					end;
-					match = match + c;
-					if !word.startsWith(match) then
-						res = res + match;
-						match = "";
-					end;
-					if match.size == word.size then
-						return res;
-					end;
-					return more();
-				end;
-				return more();			
-			end;
-			def writeString(s)
-				s.split().each(this.writeChar);
-			end;
+			res = res + c;
+			return more();
 		end;
+		return more();
 	end;
-	
-	class Codec()
-		def create(read, write)
-			this.r = read;
-			this.w = write;
+
+	def readUntilWord(s, word)
+		def c, res = "", match = "";
+		def more()
+			c = s.read();
+			if !c then
+				res = res + match;
+				if res == "" then
+					return false;
+				end;
+				return res;
+			end;
+			match = match + c;
+			if !word.startsWith(match) then
+				res = res + match;
+				match = "";
+			end;
+			if match.size == word.size then
+				return res;
+			end;
+			return more();
 		end;
-		def read(src) = this.r(src),
-		    write(dst, x) = this.w(src, x);
-	private
-		def r, w;
+		return more();			
 	end;
-	
-	def utf8 = Codec(read8, write8);
 
 end;
