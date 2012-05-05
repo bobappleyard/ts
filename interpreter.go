@@ -139,9 +139,19 @@ func New() *Interpreter {
 // Start a prompt that reads expressions from stdin and prints them to stdout.
 // Swallows and prints all errors.
 func (i *Interpreter) Repl() {
+	readline.SetWordBreaks(" \t\n\"\\+-*/><=!:;|&[{()}].")
 	readline.Completer = func(query, ctx string) []string {
-		src := i.ListDefined()
-		res := []string{}
+		var src, res []string
+		p := len(ctx)-len(query)-1
+		if p > 0 && ctx[p] == '.' {
+			for k, v := range i.a {
+				if len(v.e) != 0 {
+					src = append(src, k)
+				}
+			}
+		} else {
+			src = i.ListDefined()
+		}
 		for _, x := range src {
 			if strings.HasPrefix(x, query) {
 				res = append(res, x)
@@ -209,7 +219,8 @@ func (i *Interpreter) Import(n string) *Object {
 // Run some compiled code. Panics on error.
 func (i *Interpreter) Exec(u *Unit) *Object {
 	u.link(i)
-	p := &process{frame: frame{c: u.b[0], u: u}}
+	p := new(process).init()
+	p.frame = frame{c: u.b[0], u: u}
 	p.run()
 	return p.v
 }
@@ -364,7 +375,7 @@ func (c *Class) Call(o *Object, i int, args... *Object) *Object {
 }
 
 func (o *Object) callMethod(f *Object, args []*Object) *Object {
-	p := new(process)
+	p := new(process).init()
 	p.pushFrame(0)
 	for _, x := range args {
 		p.push(x)
@@ -734,6 +745,11 @@ func (p *process) lookups(m int) *Slot {
 
 *******************************************************************************/
 
+func (p *process) init() *process {
+	p.file = False
+	return p
+}
+
 func (p *process) run() {
 	for int(p.p) < len(p.c) {
 		p.step()
@@ -906,7 +922,11 @@ func (p *process) wrapError(err interface{}) *Object {
 	if p.line == 0 {
 		return Wrap(err)
 	}
-	if o, ok := err.(*Object); ok && o.c == ErrorClass {
+	if o, ok := err.(*Object); ok && o.Is(ErrorClass) {
+		if ErrorClass.Get(o, 2).ToInt() == 0 {
+			ErrorClass.Set(o, 1, p.file)
+			ErrorClass.Set(o, 2, Wrap(p.line))
+		}
 		return o
 	}
 	e := ErrorClass.New(Wrap(err))

@@ -29,13 +29,19 @@ To run the interpreter, in a terminal type
 
 	tsi
 
-The interpreter comes in two basic modes:
+The interpreter comes in three basic modes:
+
+* Prompt -- The interpreter compiles an evaluates expressions as they are
+entered into a terminal. Useful for finding out about the system.
 
 * Script -- Executes a TranScript program. This program may be in source form 
 or in binary form.
 
-* Prompt -- The interpreter compiles an evaluates expressions as they are
-entered into a terminal. Useful for finding out about the system.
+* Compiler -- Create binary representation of TranScript code.
+
+The Prompt
+----------
+
 
 Script Files
 ------------

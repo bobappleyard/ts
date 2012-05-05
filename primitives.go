@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"unicode/utf8"
+	"path"
 )
 
 /*******************************************************************************
@@ -33,14 +34,15 @@ func init() {
 	initBaseClasses()
 	initSimpleClasses()
 	initNumberClasses()
-	initCollectionClasses()
 	initDataClasses()
 	initCache()
+	initCollectionClasses()
 }
 
 // cache what are likely to be frequently used values
 var intCache [1024]*Object
 var strCache [128]*Object
+var emptyStr = new(strObj).init("")
 
 func initCache() {
 	for i := 0; i < 1024; i++ {
@@ -112,6 +114,9 @@ func Wrap(x interface{}) *Object {
 	case float64:
 		return new(fltObj).init(v)
 	case string:
+		if v == "" {
+			return emptyStr
+		}
 		if len(v) == 1 {
 			return strCache[v[0]]
 		}
@@ -312,6 +317,27 @@ func loadExtension(n string,
 	return itpr.Get("Package").ToClass().Extend(itpr, n, 0, es).New(Wrap(n))
 }
 
+func fileExists(path string) bool {
+	_, e := os.Stat(path)
+	return e == nil
+}
+
+func loadPackageFile(name string, pathspec, file *Object, i *Interpreter) {
+	name = strings.Replace(name, ".", "/", -1)
+	paths := strings.Split(pathspec.ToString(), ":")
+	if file != False {
+		dir := path.Dir(file.ToString())		
+		paths = append([]string{dir}, paths...)
+	}
+	for _, x := range paths {
+		n := x + "/" + name + ".pkg"
+		if fileExists(n) {
+			i.Load(n)
+			return
+		}
+	}
+}
+
 const (
 	pkgPos = "/src/pkg/github.com/bobappleyard/ts"
 	tsRoot = "/usr/local/go" + pkgPos
@@ -341,25 +367,34 @@ func definePrimitives(i *Interpreter) {
 			delete(loaded, nm.String())
 			return Nil
 		}),
-		MSlot("__aget__", func(o, nm *Object) *Object {
-			name := nm.ToString()
-			// already loaded
-			if pkg := loaded[name]; pkg != nil {
-				return pkg
-			}
-			// defined as an extension
-			if f := extensions[name]; f != nil {
-				loaded[name] = loadExtension(name, f, i)
-			} else {
-			// written in TranScript
-				path := strings.Replace(name, ".", "/", -1)
-				i.Load(o.Get(pathField).ToString() + "/" +  path + ".pkg")
-			}
-			if pkg := loaded[name]; pkg != nil {
-				return pkg
-			}
-			panic(fmt.Errorf("package improperly defined: %s", name))
-		}),
+		Slot {
+			Name: "__aget__",
+			Kind: Method,
+			Vis: Public,
+			Value: new(funcObj).init(func(p *process) {
+				p.b = len(p.s) - p.n
+				var nm *Object
+				p.parseArgs(&nm)
+				name := nm.ToString()
+				// already loaded
+				if pkg := loaded[name]; pkg != nil {
+					p.ret(pkg)
+					return
+				}
+				// defined as an extension
+				if f := extensions[name]; f != nil {
+					loaded[name] = loadExtension(name, f, i)
+				} else {
+				// written in TranScript
+					loadPackageFile(name, p.t.Get(pathField), p.file, i)
+				}
+				if pkg := loaded[name]; pkg != nil {
+					p.ret(pkg)
+					return
+				}
+				panic(fmt.Errorf("package improperly defined: %s", name))
+			}),
+		},
 		MSlot("__aset__", func(o, i, x *Object) *Object {
 			loaded[i.ToString()] = x
 			return Nil		
@@ -1072,24 +1107,6 @@ func initDataClasses() {
 		}),
 	})
 
-	ErrorClass = ObjectClass.extend("Error", 0, []Slot {
-		FSlot("msg", ""),
-		FSlot("file", ""),
-		FSlot("line", 0),
-		MSlot("toString", func(o *Object) *Object {
-			msg := ErrorClass.Get(o, 0)
-			file := ErrorClass.Get(o, 1)
-			line := ErrorClass.Get(o, 2).ToInt()
-			if line == 0 {
-				return msg
-			}
-			return Wrap(fmt.Sprintf("%s(%d): %s", file, line, msg))
-		}),
-		MSlot("create", func(o, msg *Object) *Object {
-			ErrorClass.Set(o, 0, msg)
-			return Nil
-		}),
-	})
 }
 
 func numG(fi func(a, b int) *Object,
@@ -1245,6 +1262,25 @@ func setOp(a, b []*Object, op int) (ina, inb, inboth []*Object) {
 }
 
 func initCollectionClasses() {
+	ErrorClass = ObjectClass.extend("Error", 0, []Slot {
+		FSlot("msg", ""),
+		FSlot("file", ""),
+		FSlot("line", 0),
+		MSlot("toString", func(o *Object) *Object {
+			msg := ErrorClass.Get(o, 0)
+			file := ErrorClass.Get(o, 1)
+			line := ErrorClass.Get(o, 2).ToInt()
+			if line == 0 {
+				return msg
+			}
+			return Wrap(fmt.Sprintf("%s(%d): %v", file, line, msg))
+		}),
+		MSlot("create", func(o, msg *Object) *Object {
+			ErrorClass.Set(o, 0, msg)
+			return Nil
+		}),
+	})
+
 	ArrayClass = ObjectClass.extend("Array", Final, []Slot {
 		MSlot("join", func(o *Object, args []*Object) *Object {
 			if len(args) > 1 {
@@ -1386,27 +1422,6 @@ func initCollectionClasses() {
 			}
 			return Wrap(res)
 		}),
-		MSlot("zip", func(o *Object) *Object {
-			as := [][]*Object{}
-			l := -1
-			for _, x := range o.ToArray() {
-				a := x.ToArray()
-				as = append(as, a)
-				m := len(a)
-				if l == -1 || m < l {
-					l = m
-				}
-			}
-			res := make([]*Object, l)
-			for i := 0; i < l; i++ {
-				b := make([]*Object, len(as))
-				for j, a := range as {
-					b[j] = a[i]
-				}
-				res[i] = Wrap(b)
-			}
-			return Wrap(res)
-		}),		
 		MSlot("__aget__", func(o, i *Object) *Object {
 			return o.ToArray()[i.ToInt()]
 		}),

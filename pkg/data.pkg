@@ -34,7 +34,7 @@ package data
 		end;
 	end;
 	
-	def Stream(s, codec) = Stream(codec, class()
+	def Stream(s, codec) = Mixin(codec, class()
 		def readBuffer(buf) = s.readBuffer(buf);
 		def writeBuffer(buf) = s.writeBuffer(buf);
 	end)();

@@ -1,4 +1,126 @@
-// Standard Library
+// The part of the standard library implemented in TranScript.
+
+// Basic iterative constructs.
+
+def loop(f)
+	f();
+	return loop(f);
+end;
+
+def while(f)
+	if f() then
+		return while(f);
+	end;
+end;
+
+def for(from, to, f)
+	if from < to then
+		f(from);
+		return for(from + 1, to, f);
+	end;
+end;
+
+// linked lists
+def empty = class()
+	def size get() = 0;
+	def __aget__(i)
+		throw(Error("index out of range"));
+	end;
+end();
+
+class Pair()
+	def create(a, d)
+		this.a = a;
+		this.d = d;
+	end;
+	
+	def left get() = this.a;
+	def right get() = this.d;
+	def size get() = this.length(0);
+
+	def __aget__(i)
+		if i == 0 then
+			return this.a;
+		end;
+		return this.d[i-1];
+	end;
+private
+	def length(l)
+		if this.d == empty then
+			return l+1;
+		end;
+		return this.d.length(l+1);
+	end;
+	def a, d;
+end;
+
+def list(xs*)
+	def len = xs.size, res = empty;
+	for(1, len+1, fn(i)
+		res = Pair(xs[len-i], res);
+	end);
+	return res;
+end;
+
+def isList(x)
+	if x == empty then
+		return true;
+	elif x.is(Pair) then
+		return isList(x.right);
+	else
+		return false;
+	end;
+end;
+
+// Rearrange arrays so that rows become columns.
+def zip(as*)
+	def alen = as.size, rlen = 1/0;
+	as.each(fn(x)
+		def s = x.size;
+		if s < rlen then
+			rlen = s;
+		end;
+	end);
+	if rlen == 1/0 then
+		throw(Error("infinite range"));
+	end;
+	def res = Array(rlen);
+	for(0, rlen, fn(i)
+		def a = Array(alen);
+		for(0, alen, fn(j)
+			a[j] = as[j][i];
+		end);
+		res[i] = a;
+	end);
+	return res;
+end;
+
+// Map like in Scheme.
+def map(f, ls*)
+	return zip.apply(ls).map(f.apply);
+end;
+
+// Represent a range of numbers as if it were an array.
+class Range()
+	def create(from, to?)
+		this.from = from;
+		this.to = to;
+	end;
+	def size get()
+		if this.to then
+			return this.to - this.from;
+		end;
+		return 1/0;
+	end;
+	def __aget__(off)
+		if off > this.size then
+			throw(Error("index out of range"));
+		end;
+		return this.from + off;
+	end;
+private
+	def from, to;
+end;
 
 // Printf-like function.
 def printf(pat, xs*)
