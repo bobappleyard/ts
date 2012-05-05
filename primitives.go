@@ -42,7 +42,7 @@ func init() {
 // cache what are likely to be frequently used values
 var intCache [1024]*Object
 var strCache [128]*Object
-var emptyStr = new(strObj).init("")
+var emptyStr *Object
 
 func initCache() {
 	for i := 0; i < 1024; i++ {
@@ -51,6 +51,7 @@ func initCache() {
 	for i := 0; i < 128; i++ {
 		strCache[i] = new(strObj).init(string(i))
 	}
+	emptyStr = new(strObj).init("")
 }
 
 func wrapInt(x int) *Object {
