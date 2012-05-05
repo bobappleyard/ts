@@ -699,7 +699,7 @@ func transPkg(n *Node) *Node {
 	// package internal runs inside a block
 	fn := kNode(fnNode).Add(new(Node))
 	fn.Add(n.Child[2:]...)
-	fn.Add(kNode(retNode).Add(kNode(callNode).Add(pc, vNode(nm))))
+	fn.Add(kNode(retNode).Add(kNode(callNode).Add(pc)))
 	return kNode(mutNode).Add(pl, kNode(callNode).Add(fn))
 }
 

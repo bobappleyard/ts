@@ -46,7 +46,7 @@ package flag
 				end;
 				a.set(res, true);
 				return step(i+1);
-			else
+			elif system.args.size > 1 then
 				res.args = system.args.slice(i);
 			end;
 		end;

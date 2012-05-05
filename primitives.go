@@ -315,7 +315,7 @@ func loadExtension(n string,
 	for k, v := range f(itpr) {
 		es = append(es, Slot{Name: k, Kind: Field, Vis: Public, Value: v})
 	}
-	return itpr.Get("Package").ToClass().Extend(itpr, n, 0, es).New(Wrap(n))
+	return itpr.Get("Package").ToClass().Extend(itpr, n, 0, es).New()
 }
 
 func fileExists(path string) bool {
@@ -327,8 +327,11 @@ func loadPackageFile(name string, pathspec, file *Object, i *Interpreter) {
 	name = strings.Replace(name, ".", "/", -1)
 	paths := strings.Split(pathspec.ToString(), ":")
 	if file != False {
-		dir := path.Dir(file.ToString())		
-		paths = append([]string{dir}, paths...)
+		p := file.ToString()
+		if strings.Index(p, "/") != -1 {
+			dir := path.Dir(p)
+			paths = append([]string{dir}, paths...)
+		}
 	}
 	for _, x := range paths {
 		n := x + "/" + name + ".pkg"
@@ -403,13 +406,8 @@ func definePrimitives(i *Interpreter) {
 	})
 	var pkgClass *Class
 	pkgClass = ObjectClass.extend("Package", 0, []Slot{
-		PSlot("name_f", Nil),
-		MSlot("create", func(o, n *Object) *Object {
-			pkgClass.Set(o, 0, n)
-			return Nil
-		}),
 		PropSlot("name", func(o *Object) *Object {
-			return pkgClass.Get(o, 0)
+			return Wrap(o.c.n)
 		}, Nil),
 	})
 	
