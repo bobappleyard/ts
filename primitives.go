@@ -55,7 +55,7 @@ func initCache() {
 }
 
 func wrapInt(x int) *Object {
-	if x < 1024 {
+	if x >= 0 && x < 1024 {
 		return intCache[x]
 	}
 	return new(intObj).init(x)
