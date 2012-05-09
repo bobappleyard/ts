@@ -13,8 +13,8 @@ nest.
 //	/* block comment */
 /*
 
-Numbers are represented as series of digits, optionally separated with `.`
-and/or preceded with `-`.
+Numbers are represented as series of digits, optionally separated with "."
+and/or preceded with "-".
 
 	0
 	150
@@ -30,10 +30,10 @@ The basic arithmetic and comparative operators work as expected.
 	5 >= 4          // true
 	5 == 4 + 2      // false
 
-Supported operations are `+`, `-`, `*`, `/`, `==`, `!=`, `<`, `>`, `<=`, `>=`.
+Supported operations are "+", "-", "*", "/", "==", "!=", "<", ">", "<=", ">=".
 
-Names follow the C syntax convention: Letters or `_` to begin, letters, digits
-or `_` after that.
+Names follow the C syntax convention: Letters or "_" to begin, letters, digits
+or "_" after that.
 
 	foo
 	Object
@@ -45,7 +45,7 @@ a member on an object.
 	a               // definition
 	a.prop          // member
 
-There are two boolean values, `true` and `false`. 
+There are two boolean values, "true" and "false". 
 
 Booleans support one operation, negation.
 
@@ -53,10 +53,10 @@ Booleans support one operation, negation.
 	!false          // true
 
 This is actually supported by every other object in TranScript as well. For
-every value other than `false`, `false` is returned. For `false`, `true` is
+every value other than "false", "false" is returned. For "false", "true" is
 returned.
 
-The logical operators `&&` (and) and `||` (or) are provided.
+The logical operators "&&" (and) and "||" (or) are provided.
 
 	true && true    // true
 	false || true   // true
@@ -67,19 +67,19 @@ These operator have short-circuiting. This means that if the value of the
 expression can be determined after evaluating the left operand, the right 
 operand is not evaluated.
 
-There is `nil`, which represents no value. This is primarily used as the return 
+There is "nil", which represents no value. This is primarily used as the return 
 value of functions and methods that are only called for their side effects.
 
-Strings have the usual C-like syntax: enclosed in `"`, with `\` for escape 
-sequences.
+Strings have the usual C-like syntax: enclosed in speech marks with "\" for
+escape sequences.
 
 	"Hello, world!\n"
 
-Two strings may be concatenated using `+`.
+Two strings may be concatenated using "+".
 
 	"Hello, " + "world!\n" // gives the same value as before
 
-Arrays are series of objects enclosed in brackets and separated with `,`.
+Arrays are series of objects enclosed in brackets and separated with ",".
 
 	[1, 2, 3]
 
@@ -92,8 +92,8 @@ Arrays may be concatenated as strings are.
 
 	[1, 2] + [3, 4] // [1, 2, 3, 4]
 
-Hashes are key-value pairs enclosed in curly brackets and separated with `,`.
-In each pair, the key is separated from the value by `:`.
+Hashes are key-value pairs enclosed in curly brackets and separated with ",".
+In each pair, the key is separated from the value by ":".
 
 	{"key1": "value1", "key2": "value2"}
 
@@ -102,14 +102,14 @@ useful keys most of the time, though.
 
 Conditional Evaluation
 
-An if statement evaluates an expression. If it evaluates to `true` then `if` 
-evalutates its `then` block. If the expression evaluates to `false` then `if` 
-evaluates its else block. Every value other than `false` is counted as `true` to
-an `if` statement.
+An if statement evaluates an expression. If it evaluates to "true" then "if" 
+evalutates its "then" block. If the expression evaluates to "false" then "if" 
+evaluates its else block. Every value other than "false" is counted as "true" to
+an "if" statement.
 
 	if <expression> then <block> else <block> end
 
-A block is a series of statements, each terminated with `;`.
+A block is a series of statements, each terminated with ";".
 
 	a = 1;
 	b = 2;
@@ -125,7 +125,7 @@ e.g.
 		print("a is greater than five");
 	end;
 
-This prints `a is less than five`.
+This prints "a is less than five".
 
 Variables And Scope
 
@@ -133,13 +133,13 @@ Variables allow you to store state and refer to the results of expresssions.
 
 Defining a variable looks like
 
-	def <name>;           // uninitialised
-	def <name> = <expr>;  // initialised to the value of <expr>
-	def <name>, <name>;   // comma allows multiple definitions
+	def <name>;                  // uninitialised
+	def <name> = <expr>;         // initialised to the value of <expr>
+	def <name>, <name>;          // comma allows multiple definitions
 	def <name> = <expr>, <name>; // different forms may be mixed freely
 
 Variables may refer to previously defined variables in their initialisation
-section. Local variables may be defined at the start of a block.
+section. 
 
 Locally defined variables shadow previous definitions.
 
@@ -152,14 +152,14 @@ e.g.
 	end;
 	print(f(), a);
 
-This prints `2 1`.
+This prints "2 1".
 
 Once a variable has been defined, it may be updated so that the variable refers
 to a new value.
 
 	<name> = <expr>;
 
-So if we alter the previous example, removing the internal definition, `a` is
+So if we alter the previous example, removing the internal definition, "a" is
 altered in place rather than shadowed.
 
 	def a = 1;
@@ -169,7 +169,7 @@ altered in place rather than shadowed.
 	end;
 	print(f(), a);
 
-This prints `2 2`.
+This prints "2 2".
 
 Functions
 
@@ -186,20 +186,20 @@ Anonymous functions:
 
 	fn (<args>) <body>
 
-<args> is a series of names separated by `,` and represents the arguments to 
+<args> is a series of names separated by "," and represents the arguments to 
 the function.
 
-An argument may be designated as optional by appending `?` to the
+An argument may be designated as optional by appending "?" to the
 name. All the optional arguments must appear after all the normal arguments. If
 the argument isn't provided when the function is called its value is set to 
-`false`.
+"false".
 
-If the final argument is followed by `*` then it is a "rest argument"
+If the final argument is followed by "*" then it is a "rest argument"
 and represents any parameters passed to the function that are not caught by
-previous argument names (optional or otherwise).
+previous argument names (optional or otherwise). This is encoded as an array.
 
-<body> is either `=` followed by an expression, or a block terminated with 
-`end`.
+<body> is either "=" followed by an expression, or a block terminated with 
+"end".
 
 i.e. for anonymous functions
 
@@ -210,10 +210,10 @@ In the former case, it is as if
 
 	fn (<args>) return <expr>; end
 
-had been written instead. See below for a description of what `return` does.
+had been written instead. See below for a description of what "return" does.
 
-To call a function, append expressions enclosed in `(` and `)` and separated by
-`,`. These expressions are evaluated in the caller's environment and passed to 
+To call a function, append expressions enclosed in "(" and ")" and separated by
+",". These expressions are evaluated in the caller's environment and passed to 
 the function. They are then bound to the corresponding arguments in the callee's
 environment, and the callee's body is evaluated in this new environment.
 
@@ -228,9 +228,9 @@ e.g.
 	end;
 	f(5);
 
-Prints `5`.
+Prints "5".
 
-Functions may return values using the `return` statement.
+Functions may return values using the "return" statement.
 
 	return <expr>
 
@@ -255,7 +255,7 @@ e.g.
 		print(i);
 	end);
 
-Prints `0` to `9` on consecutive lines. When `for` calls itself, the stack 
+Prints "0" to "9" on consecutive lines. When "for" calls itself, the stack 
 remains where it is. This is exactly equivalent to a "for loop" in many other
 languages, but using function calls rather than special syntax.
 
@@ -273,16 +273,12 @@ e.g.
 	end;
 
 This implements a function that, when called, returns another function. This 
-inner function refers to `x` after `accumulate` has returned. This is what some 
+inner function refers to "x" after "accumulate" has returned. This is what some 
 people call "closures," others call "lexical scope."
 
 	def a = accumulate(1);
 	a(1);                   // 2
 	a(4);                   // 6
-
-It provides a powerful mechanism for encapsulating state and describing
-processes. Thanks to this, many parts of the standard library (functions and 
-methods) take functions as arguments.
 
 Objects and Classes
 
@@ -298,10 +294,10 @@ its class like a function:
 
 	def o = Object();
 
-Here, `Object` is the class that will be used to instantiate the object. This
+Here, "Object" is the class that will be used to instantiate the object. This
 may be any expression that evaluates to a class.
 
-To define a class, use the `class` keyword
+To define a class, use the "class" keyword
 
 	class <class name>(<ancestor>)
 		<class body>
@@ -309,9 +305,9 @@ To define a class, use the `class` keyword
 
 The <ancestor> is an expression that evaluates to a class, and is used for 
 inheritance. Any members defined on the ancestor are also defined on this class.
-It may be omitted, in which case `Object` is used.
+It may be omitted, in which case "Object" is used.
 
-The <class body> is a series of `def` statements punctuated with `;`.
+The <class body> is a series of "def" statements punctuated with ";".
 Definitions that look like variables correspond to properties and definitions
 that look like functions correspond to methods.
 
@@ -328,9 +324,9 @@ e.g.
 		end;
 	end;
 
-The `create` method is the constructor. This is called immediately after the
-`Vector` object has been created. More precisely, `__new__` is called, which
-calls `create` and then returns the new object.
+The "create" method is the constructor. This is called immediately after the
+"Vector" object has been created. More precisely, "__new__" is called, which
+calls "create" and then returns the new object.
 
 Properties
 
@@ -343,18 +339,18 @@ return value is taken to be the value of the property. When the property is
 written to, the setter is called with one parameter, the value being assigned to 
 that property.
 
-To define a property, use `get` and `set` in a definition:
+To define a property, use "get" and "set" in a definition:
 
 	def <name> get() <body> set(<val>) <body>;
 
-Note that only one of `get` and `set` need to be present. If `set` is absent,
-the property is read-only. If `get` is absent, the property is write-only.
+Note that only one of "get" and "set" need to be present. If "set" is absent,
+the property is read-only. If "get" is absent, the property is write-only.
 
 Methods
 
 Methods are functions that are attached to classes. When in the body of a method 
-an extra variable is available, `this`, which represents the object the method
-is being called on. There is also `super`, which represents `this` without the
+an extra variable is available, "this", which represents the object the method
+is being called on. There is also "super", which represents "this" without the
 current class' overrides.
 
 e.g.
@@ -362,14 +358,14 @@ e.g.
 	1.toString()     // this set to 1 in call to toString()
 	a.b.c(d);        // this set to b in call to c()
 
-Methods will "remember" the `this` value when accessed as properties.
+Methods will "remember" the "this" value when accessed as properties.
 
 e.g.
 
 	def f = 1.toString;
 	print(f());
 
-Prints `1`.
+Prints "1".
 
 */
 package ts
