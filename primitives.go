@@ -24,7 +24,7 @@ var ObjectClass *Class
 // do not work on these classes.
 var ClassClass, AccessorClass, NilClass, BooleanClass, TrueClass, FalseClass,
     StringClass, NumberClass, IntClass, FltClass, FunctionClass, ArrayClass,
-    HashClass, CollectionClass, ErrorClass, BufferClass,
+    HashClass, ErrorClass, BufferClass,
     frameClass, skeletonClass, boxClass, undefinedClass *Class
 
 // Built in values.

@@ -176,6 +176,25 @@ Functions
 Functions are an important part of TranScript. They are first-class and are 
 properly tail-recursive.
 
+To call a function, take the expression that evaluates to the function and
+append expressions enclosed in "(" and ")" and separated by ",". These 
+expressions are evaluated before they are passed to the function. They are then 
+bound to the corresponding arguments in the function's environment, and the 
+function's body is evaluated in this new environment.
+
+	<function>(<expr>, ...)
+
+Here <function> means an expression that evaluates to a function.
+
+e.g.
+
+	def f(x)
+		print(x);
+	end;
+	f(5);
+
+Prints "5".
+
 Functions can be defined in two ways.
 
 Named functions:
@@ -194,9 +213,28 @@ name. All the optional arguments must appear after all the normal arguments. If
 the argument isn't provided when the function is called its value is set to 
 "false".
 
+e.g.
+
+	def fprint(x, f?)
+		if f then
+			f.writeString(x.toString() + "\n");
+		else
+			print(x);
+		end;
+	end;
+
 If the final argument is followed by "*" then it is a "rest argument"
 and represents any parameters passed to the function that are not caught by
 previous argument names (optional or otherwise). This is encoded as an array.
+
+e.g.
+
+	def compose(f, g, more?, rest*)
+		if more then
+			g = compose.apply([g, more] + rest);
+		end;
+		return f(g(x));
+	end;
 
 <body> is either "=" followed by an expression, or a block terminated with 
 "end".
@@ -211,24 +249,6 @@ In the former case, it is as if
 	fn (<args>) return <expr>; end
 
 had been written instead. See below for a description of what "return" does.
-
-To call a function, append expressions enclosed in "(" and ")" and separated by
-",". These expressions are evaluated in the caller's environment and passed to 
-the function. They are then bound to the corresponding arguments in the callee's
-environment, and the callee's body is evaluated in this new environment.
-
-	<function>(<expr>, ...)
-
-Here <function> means an expression that evaluates to a function.
-
-e.g.
-
-	def f(x)
-		print(x);
-	end;
-	f(5);
-
-Prints "5".
 
 Functions may return values using the "return" statement.
 
@@ -285,9 +305,9 @@ Objects and Classes
 Objects are collections of slots. They support three basic operations: property
 get; property set; method call.
 
-	a.field      // reading a field/property
-	a.field = x  // writing a field/property
-	a.method()   // calling a method
+	a.prop       // get prop
+	a.prop = x   // set prop to x
+	a.method()   // call method
 
 Objects are instances of classes, which describe them. To create an object, call
 its class like a function:
