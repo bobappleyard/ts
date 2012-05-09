@@ -59,7 +59,7 @@ package data
 		def more()
 			def c = a.readByte();
 			if c then
-				b.writeByte();
+				b.writeByte(c);
 				return more();
 			end;
 		end;

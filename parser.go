@@ -741,7 +741,7 @@ func parseImport(p *Parser, l *Lexer, t Token) *Node {
 }
 
 // tying it all together
-var expr, stmt = new(Parser), new(Parser)
+var expr, stmt *Parser
 
 func parseToplevel(l *Lexer) *Node {
 	t := l.Lookahead()
@@ -765,6 +765,12 @@ func parseToplevel(l *Lexer) *Node {
 }
 
 func init() {
+	expr, stmt = initParsers()	
+}
+
+func initParsers() (expr, stmt *Parser) {
+	expr, stmt = new(Parser), new(Parser)
+	
 	expr.RegPrefix(eof, "", ParserFunc(parseEof))
 	
 	expr.RegPrefix(str, "", ParserFunc(parseStr))
@@ -817,9 +823,9 @@ func init() {
 	stmt.RegPrefix(id, "class", ParserFunc(parseInnerClass))
 	stmt.RegPrefix(id, "if", ParserFunc(parseIf))
 	stmt.RegPrefix(id, "return", ParserFunc(parseReturn))
-//	stmt.RegPrefix(id, "loop", ParserFunc(parseLoop))
-//	stmt.RegPrefix(id, "for", ParserFunc(parseFor))
 	stmt.RegPrefix(id, "import", ParserFunc(parseImport))
 	stmt.RegElse(ParserFunc(parseStmt))
+	
+	return
 }
 

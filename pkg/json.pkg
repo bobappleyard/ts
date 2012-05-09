@@ -1,43 +1,155 @@
 package json
-	export /*readJson, writeJson,*/ string;
+	export string;
 	
-	import data;
+	import data, text;
+
+	def jsonifiers = {
+		Nil: fn(x) = "null",
+		String: fn(x) = x.quote(),
+		Boolean: fn(x) = x.toString(),
+		Number: fn(x) = x.toString(),
+		Array: fn(x) = "[" + x.map(string).join(",") + "]",
+		Hash: fn(x) = "{" +
+	        x.keys()
+	         .map(fn(k) = k.quote() + ":" + string(x[k]))
+	         .join(",") +
+		"}",
+		Function: fn(x) = throw("bad type"),
+		Class: fn(x) = throw("bad type"),
+	};
 	
 	def toJson = Accessor("toJson");
 	
 	def string(x)
-		if x == nil then
-			return "null";
-		elif x.is(String) then
-			return x.quote();
-		elif x.is(Boolean) || x.is(Number) then
-			return x.toString();
-		elif x.is(Array) then 
-			return "[" + x.map(string).join(",") + "]";
-		elif x.is(Hash) then
-			return "{" 
-			        + x.keys()
-			           .map(fn(k) = k.quote() + ":" + string(x[k]))
-			           .join(",") 
-			     + "}";
-		elif x.is(Function) || x.is(Class) then
-			throw(Error("bad type"));
-		elif toJson.defined(x) then
+		if toJson.defined(x) then
 			return x.toJson();
-		else
-			def build(a) = a.name.unquote + ":" + string(a.get(x));
-			def res = "{" 
-			           + x.type.names("")
-			                   .map(Accessor)
-			                   .filter(fn(a) = a.property(x))
-			                   .map(build)
-			                   .join(",")
-			        + "}";
-			if res == "{}" then
-				throw(Error("bad type"));
-			end;
-			return res;
+		end;
+		def f = jsonifiers[x.type];
+		if f then
+			return f(x);
+		end;
+		
+		def build(a) = a.name.quote() + ":" + string(a.get(x));
+		def res = "{" +
+			x.type.names("")
+			      .map(Accessor)
+			      .filter(fn(a) = a.property(x))
+			      .map(build)
+			      .join(",") +
+		"}";
+		if res == "{}" then
+			throw(Error("bad type"));
+		end;
+		return res;
+	end;
+	
+	def readChar(s) = text.utf8.read(s);
+	
+	def read1stChar(s)
+		def c = readChar(s);
+		if " \n\t".contains(c) then
+			return readChar(s);
+		end;
+		return c;
+	end;
+	
+	def unexpected(c)
+		throw("unexpected character: " + c);
+	end;
+	
+	def expect(s, c)
+		def d = readChar(s);
+		if c != d then
+			unexpected(c);
 		end;
 	end;
 	
+	def readHash(c, s)
+		def first = false;
+		if c.is(String) then
+			c = {};
+			first = true;
+		end;
+		def d = readChar(s);
+		if d == "}" then
+			return c;
+		elif (d == "," && first) || (d != "," && !first) then
+			unexpected(d);
+		end;
+		def k = readString(d, s);
+		expect(s, ":");
+		def v = read(s);
+		c[k] = v;
+		return readHash(c, s);
+	end;
+	
+	def readArray(c, s)
+		def first = false;
+		if c.is(String) then
+			c = [];
+			first = true;
+		end;
+		def d = readChar(s);
+		if d = "]" then
+			return c;
+		elif (d == "," && first) || (d != "," && !first) then
+			unexpected(d);
+		end;
+		c.add(read(s));
+		return readArray(c, s);
+	end;
+	
+	def readString(c, s)
+		if c != "\"" then
+			unexpected(c);
+		end;
+		def d = readChar(s);
+		if d == "\"" then
+			return c.unquote();
+		end;
+		c = c + d;
+		elif d == "\\" then
+			return readString(c + readChar(s), s);
+		end;
+		return readString(c, s);
+	end;
+	
+	def readVal(n, v) = fn(c, s)
+		n.split().each(fn(d)
+			if c != d then
+				unexpected(c);
+			end;
+			c = readChar();
+		end);
+		return v;
+	end;
+	
+	def readNum(c, s)
+		
+	end;
+	
+	def jsonlex = {
+		"{": readHash,
+		"[": readArray,
+		"\"": readString,
+		"t": readval("true", true),
+		"f": readval("false", false),
+		"n", readval("null", nil),
+		"-", readNum
+	}
+	for(0, 10, fn(i)
+		jsonlex[i.toString()] = readNum;
+	end);
+	
+	def read(s)
+		def c = read1stChar(s);
+		def f = jsonlex[c];
+		if !f then
+			throw("unexpected character: " + c);
+		end;
+		return f(c, s);
+	end;
+	
 end;
+
+

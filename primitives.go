@@ -1141,11 +1141,11 @@ func numOp(fi func(a,b int) int,
            ff func(a,b float64) float64) func(o, b *Object) *Object {
 	return numG(func(a,b int) *Object {
 		if fi == nil {
-			return new(fltObj).init(ff(float64(a), float64(b)))
+			return Wrap(ff(float64(a), float64(b)))
 		}
-		return new(intObj).init(fi(a, b))
+		return Wrap(fi(a, b))
 	}, func(a,b float64) *Object {
-		return new(fltObj).init(ff(a, b))
+		return Wrap(ff(a, b))
 	}, nil)
 }
 

@@ -1,5 +1,3 @@
-// A simple dynamic object-oriented programming language.
-//
 package ts
 
 import (
