@@ -171,7 +171,7 @@ func (i *Interpreter) Repl() {
 			}
 			l := NewScanner(r, "stdin")
 			if u.CompileStmt(l) {
-				readline.AddHistory(l.Scanned())
+				readline.AddHistory(strings.Replace(l.Scanned(), "\n", "", -1))
 				x := i.Exec(u)
 				if x != Nil {
 					fmt.Printf("\033[36m%s\033[0m\n", x)
