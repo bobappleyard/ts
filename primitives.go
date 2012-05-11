@@ -1094,6 +1094,13 @@ func initDataClasses() {
 			}
 			return Wrap(s)
 		}),
+		MSlot("charCode", func(o *Object) *Object {
+			r, _ := utf8.DecodeRuneInString(o.ToString())
+			if r == utf8.RuneError {
+				panic(fmt.Errorf("malformed string"))
+			}
+			return Wrap(r)
+		}),
 		MSlot("__add__", func(o, s *Object) *Object {
 			res := Wrap(o.ToString() + s.ToString())
 			return res
@@ -1215,6 +1222,9 @@ func initNumberClasses() {
 	IntClass = NumberClass.extend("Integer", Final|Primitive, []Slot {
 		MSlot("toString", func(o *Object) *Object {
 			return Wrap(fmt.Sprint(o.ToInt()))
+		}),
+		MSlot("toChar", func(o *Object) *Object {
+			return Wrap(string(rune(o.ToInt())))
 		}),
 		MSlot("toInt", func(o *Object) *Object {
 			return o
