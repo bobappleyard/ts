@@ -1,0 +1,3 @@
+Functions for reading and writing text in particular encodings (currently only
+utf8).
+
