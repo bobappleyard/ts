@@ -223,23 +223,23 @@ func Wrap(x interface{}) *Object {
 
 // Public field slot.
 func FSlot(n string, f interface{}) Slot {
-	return Slot{Kind: Field, Vis: Public, Name: n, Value: Wrap(f)}
+	return Slot{Flags: Flags(Field, Public), Name: n, Value: Wrap(f)}
 }
 
 // Private field slot.
 func PSlot(n string, f interface{}) Slot {
-	return Slot{Kind: Field, Vis: Private, Name: n, Value: Wrap(f)}
+	return Slot{Flags: Flags(Field, Private), Name: n, Value: Wrap(f)}
 }
 
 // Public method slot.
 func MSlot(n string, f interface{}) Slot {
-	return Slot{Kind: Method, Vis: Public, Name: n, Value: Wrap(f)}
+	return Slot{Flags: Flags(Method, Public), Name: n, Value: Wrap(f)}
 }
 
 // Public property slot.
 func PropSlot(n string, g, s interface{}) Slot {
 	gv, sv := Wrap(g), Wrap(s)
-	return Slot{Kind: Property, Vis: Public, Name: n, Value: gv, Set: sv}
+	return Slot{Flags: Flags(Property, Public), Name: n, Value: gv, Set: sv}
 }
 
 // Slot describing a method that descendant classes ought to implement.
@@ -313,7 +313,7 @@ func loadExtension(n string,
                     itpr *Interpreter) *Object {
 	es := []Slot{}
 	for k, v := range f(itpr) {
-		es = append(es, Slot{Name: k, Kind: Field, Vis: Public, Value: v})
+		es = append(es, Slot{Name: k, Flags: Flags(Field, Public), Value: v})
 	}
 	return itpr.Get("Package").ToClass().Extend(itpr, n, 0, es).New()
 }
@@ -373,8 +373,7 @@ func definePrimitives(i *Interpreter) {
 		}),
 		Slot {
 			Name: "__aget__",
-			Kind: Method,
-			Vis: Public,
+			Flags: Flags(Method, Public),
 			Value: new(funcObj).init(func(p *process) {
 				p.b = len(p.s) - p.n
 				var nm *Object
@@ -843,7 +842,7 @@ func initBaseClasses() {
 				if e.Class != c {
 					nm = e.Class.n + "." + nm
 				}
-				switch e.Kind {
+				switch e.Flags.Kind() {
 				case Method:
 					fmt.Println(i, e.offset, nm + "()")
 				case Field:
@@ -874,14 +873,15 @@ func initBaseClasses() {
 			if e == nil {
 				return False
 			}
-			return Wrap(e.Kind == Field || e.Kind == Property)
+			kind := e.Flags.Kind()
+			return Wrap(kind == Field || kind == Property)
 		}),
 		MSlot("method", func(a, o *Object) *Object {
 			e := a.accessorData().lookup(o)
 			if e == nil {
 				return False
 			}
-			return Wrap(e.Kind == Method)
+			return Wrap(e.Flags.Kind() == Method)
 		}),
 		MSlot("get", func(a, o *Object) *Object {
 			return o.Get(a.accessorData())
@@ -901,7 +901,7 @@ func initBaseClasses() {
 			fmt.Println("-----")
 			for _, e := range a.e {
 				nm := e.Name
-				if e.Kind == Method {
+				if e.Flags.Kind() == Method {
 					nm += "()"
 				}
 				fmt.Println(e.offset, e.Class.n, nm)
@@ -928,7 +928,7 @@ func (c *Class) Names(hook, deep bool) []string {
 func classScanNames(c *Class, in map[string] bool, hook, deep bool) {
 	if hook {
 		for _, x := range c.e {
-			if x.Vis == Public {
+			if x.Flags.Vis() == Public {
 				in[x.Name] = true
 			}
 		}
@@ -938,7 +938,7 @@ func classScanNames(c *Class, in map[string] bool, hook, deep bool) {
 			   strings.HasSuffix(x.Name, "__") {
 			   continue
 			}
-			if x.Vis == Public {
+			if x.Flags.Vis() == Public {
 				in[x.Name] = true
 			}
 		}
@@ -1355,6 +1355,18 @@ func initCollectionClasses() {
 			i := _i.ToInt()
 			o.setArray(append(a[:i], a[i+1:]...))
 			return Nil
+		}),
+		MSlot("push", func(o *Object, x *Object) *Object {
+			a := o.ToArray()
+			o.setArray(append(a, x))
+			return Nil
+		}),
+		MSlot("pop", func(o *Object) *Object {
+			a := o.ToArray()
+			l := len(a) -1
+			x := a[l]
+			o.setArray(append(a[:l]))
+			return x
 		}),
 		MSlot("slice", func(o *Object, args []*Object) *Object {
 			t := o.ToArray()

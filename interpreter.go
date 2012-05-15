@@ -46,6 +46,7 @@ const (
 	Final = 1 << iota
 	Primitive
 	UserData
+	Anon
 )
 
 // Accessors refer to names that can be looked up on objects.
@@ -66,9 +67,11 @@ const (
 type SlotVis byte
 
 const (
-	Private SlotVis = iota
+	Private SlotVis = iota << 2
 	Public
 )
+
+type SlotFlags byte
 
 // Slots describe class members.
 //
@@ -76,8 +79,7 @@ const (
 // runtime will fill in the rest.
 type Slot struct {
 	Name string
-	Kind SlotKind
-	Vis SlotVis
+	Flags SlotFlags
 	Value, Set *Object
 	Class *Class
 	offset, access, next uint16
@@ -188,7 +190,7 @@ func (i *Interpreter) Repl() {
 // Evaluate an expression, returning its value. Panics on error.
 func (i *Interpreter) Eval(s string) *Object {
 	u := new(Unit)
-	u.CompileStr(s + ";")
+	u.CompileStr(s)
 	return i.Exec(u)
 }
 
@@ -402,7 +404,7 @@ func (o *Object) get(a *Accessor, e *Slot) *Object {
 		ao := new(accObj).init(a)
 		return o.callMethod(o.c.m[_Object_getFailed], []*Object{ao})
 	}
-	switch e.Kind {
+	switch e.Flags.Kind() {
 	case Field:
 		return o.f[e.offset]
 	case Method:
@@ -423,7 +425,7 @@ func (o *Object) set(a *Accessor, e *Slot, x *Object) {
 		o.callMethod(o.c.m[_Object_setFailed], []*Object{ao, x})
 		return
 	}
-	switch e.Kind {
+	switch e.Flags.Kind() {
 	case Field:
 		o.f[e.offset] = x
 	case Property:
@@ -442,7 +444,7 @@ func (o *Object) getMethod(a *Accessor, e *Slot) *Object {
 	if e == nil {
 		return o.methodMissing(a)
 	}
-	switch e.Kind {
+	switch e.Flags.Kind() {
 	case Field:
 		return o.f[e.offset]
 	case Method:
@@ -543,6 +545,18 @@ func (c *Class) IndexOf(n string) int {
 	return -1
 }
 
+func Flags(k SlotKind, v SlotVis) SlotFlags {
+	return SlotFlags(k) | SlotFlags(v)
+}
+
+func (f SlotFlags) Kind() SlotKind {
+	return SlotKind(f) & Marker
+}
+
+func (f SlotFlags) Vis() SlotVis {
+	return SlotVis(f) & Public
+}
+
 // Within the interpreter class extension is divided up into three phases:
 //
 // 1. The structure of the class is created to be filled in.
@@ -599,13 +613,15 @@ func (u *Unit) clInner(c *Class) {
 }
 
 func (u *Unit) addSlot(c *Class, e *Slot) {
-	if e.Kind == Marker {
+	kind := e.Flags.Kind()
+	vis := e.Flags.Vis()
+	if kind == Marker {
 		e.Class = c.p
 		return
 	}
 	a := u.a[e.access]
 	t := c.m
-	if e.Kind == Field {
+	if kind == Field {
 		t = c.f
 	}
 	for i := range a.e {
@@ -614,12 +630,12 @@ func (u *Unit) addSlot(c *Class, e *Slot) {
 			// shadowing is where a name is defined that has already been
 			// defined in an ancestor class, and this definition is 
 			// incompatible
-			if e.Kind != f.Kind || e.Vis == Private {
+			if kind != f.Flags.Kind() || vis == Private {
 				panic(fmt.Errorf("cannot shadow %s.%s", f.Class.n, e.Name))
 			}
 			// overriding causes update in place
 			t[f.offset] = e.Value
-			if e.Kind == Property {
+			if kind == Property {
 				t[f.offset+1] = e.Set
 			}
 			e.offset = f.offset
@@ -631,16 +647,16 @@ func (u *Unit) addSlot(c *Class, e *Slot) {
 	e.offset = uint16(len(t))
 	e.Class = c
 	t = append(t, e.Value)
-	if e.Kind == Property {
+	if kind == Property {
 		t = append(t, e.Set)
 	}
-	if e.Kind == Field {
+	if kind == Field {
 		c.f = t
 	} else {
 		c.m = t
 	}
 	// only public definitions go in the accessor
-	if e.Vis == Public {
+	if vis == Public {
 		a.e = append(a.e, *e)
 	}
 }
@@ -729,7 +745,7 @@ func (p *process) lookups(m int) *Slot {
 			break
 		}
 		e := &cur.e[m]
-		if e.Kind != Marker && p.v.Is(cur) {
+		if e.Flags.Kind() != Marker && p.v.Is(cur) {
 			return e
 		}
 		m = int(cur.e[m].next)
@@ -851,7 +867,7 @@ func (p *process) extend(a *Accessor) {
 	if a != nil {
 		f := a.lookupa(d)
 		if f == nil {
-			f = d.extend(d.n, 0, e[1:])
+			f = d.extend(d.n, Anon, e[1:])
 			a.e = append(a.e, Slot{Class: d, Value: f.o})
 		}
 		d = f
@@ -874,7 +890,7 @@ func (p *process) finish(n int) {
 	j := 0
 	for i := range e {
 		e[i].Name = p.u.a[e[i].access].n
-		switch e[i].Kind {
+		switch e[i].Flags.Kind() {
 		case Marker:
 		case Property:
 			e[i].Value = spec[j]
@@ -1085,11 +1101,16 @@ func (p *process) step() {
 		if n == slotUnknown {
 			panic(fmt.Errorf("only use super with methods you have overridden"))
 		}
-		e := p.sc.e[n]
-		if e.offset >= uint16(len(p.sc.a.m)) {
-			panic(fmt.Errorf("not present on ancestor: %s.%s", p.sc.n, e.Name))
+		c := p.sc
+		e := c.e[n]
+		a := c.a
+		if a.FlagSet(Anon) {
+			a = a.a
 		}
-		p.v = p.sc.a.m[e.offset]
+		if e.offset >= uint16(len(a.m)) {
+			panic(fmt.Errorf("not present on ancestor: %s.%s", c.n, e.Name))
+		}
+		p.v = a.m[e.offset]
 	
 	case SOURCE:
 		n, m := p.next(), p.next()
@@ -1277,9 +1298,7 @@ func (u *Unit) Load(r io.Reader) bool {
 		es := make([]Slot, l+1)
 		es[0].Name = readString(r, 0)
 		for j := 0; j < l; j++ {
-			desc := sbuf[3*j]
-			es[j+1].Kind = SlotKind(desc & 0xff)
-			es[j+1].Vis = SlotVis(desc >> 8)
+			es[j+1].Flags = SlotFlags(sbuf[3*j])
 			es[j+1].access = sbuf[3*j+1]
 			es[j+1].next = sbuf[3*j+2]
 		}
@@ -1380,8 +1399,7 @@ func (u *Unit) Save(w io.Writer) {
 		sk := make([]uint16, 3*l)
 		for j := 0; j < l; j++ {
 			y := es[j+1]
-			desc := (uint16(y.Vis) << 8) + uint16(y.Kind)
-			sk[3*j] = desc
+			sk[3*j] = uint16(y.Flags)
 			sk[3*j+1] = y.access
 			sk[3*j+2] = y.next
 		}

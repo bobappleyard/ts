@@ -13,7 +13,17 @@ package data
 		def r, w;
 	end;
 
-	def Mixin(codec, c) = class(c)
+	class Stream()
+		def create(src, codec)
+			this.src = src;
+			this.codec = codec;
+		end;
+		def readBuffer(buf) = this.src.readBuffer(buf);
+		def writeBuffer(buf) = this.src.writeBuffer(buf);
+		def close() = this.src.close();
+		def seek(from, by) = this.src.seek(from, by);
+		def read() = this.codec.read(this);
+		def write(x) = this.codec.write(this, x);
 		def readByte()
 			def b = Buffer(1);
 			if !this.readBuffer(b) then
@@ -26,18 +36,9 @@ package data
 			b[0] = x;
 			this.writeBuffer(b);
 		end;
-		def read()
-			return codec.read(this);
-		end;
-		def write(x)
-			return codec.write(this, x);
-		end;
+	private
+		def src, codec;
 	end;
-	
-	def Stream(s, codec) = Mixin(codec, class()
-		def readBuffer(buf) = s.readBuffer(buf);
-		def writeBuffer(buf) = s.writeBuffer(buf);
-	end)();
 	
 	def BLOCK_SIZE = 1024;
 	

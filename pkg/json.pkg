@@ -1,7 +1,13 @@
 package json
-	export string;
+	export string, parse;
 	
 	import data, text;
+	
+	def unexpected(c) = Error("unexpected character: " + c);
+	def badType(t) = Error("bad type: " + t.name);
+	def unknown(id) = Error("unknown identifier: " + id);
+	
+	// TS --> JSON
 
 	def jsonifiers = {
 		Nil: fn(x) = "null",
@@ -14,8 +20,8 @@ package json
 	         .map(fn(k) = k.quote() + ":" + string(x[k]))
 	         .join(",") +
 		"}",
-		Function: fn(x) = throw("bad type"),
-		Class: fn(x) = throw("bad type"),
+		Function: fn(x) = throw(badType(x.type)),
+		Class: fn(x) = throw(badType(x.type))
 	};
 	
 	def toJson = Accessor("toJson");
@@ -38,117 +44,170 @@ package json
 			      .join(",") +
 		"}";
 		if res == "{}" then
-			throw(Error("bad type"));
+			throw(badType());
 		end;
 		return res;
 	end;
 	
+	// JSON --> TS
+	
+	def digits = "0123456789", ws = " \n\t", over = ws + ",]}";
+	
 	def readChar(s) = text.utf8.read(s);
 	
-	def read1stChar(s)
-		def c = readChar(s);
-		if " \n\t".contains(c) then
-			return readChar(s);
+	def skipSpace(c, s)
+		if ws.contains(c) then
+			return skipSpace(readChar(s), s);
 		end;
 		return c;
 	end;
-	
-	def unexpected(c)
-		throw("unexpected character: " + c);
-	end;
-	
-	def expect(s, c)
-		def d = readChar(s);
+
+	def expect(c, d)
 		if c != d then
-			unexpected(c);
+			throw(unexpected(c));
 		end;
 	end;
 	
-	def readHash(c, s)
-		def first = false;
-		if c.is(String) then
-			c = {};
-			first = true;
+	def readNum(c, s, r, k)
+		if c == "-" then
+			return readInNum(readChar(s), s, r+c, k);
 		end;
-		def d = readChar(s);
-		if d == "}" then
-			return c;
-		elif (d == "," && first) || (d != "," && !first) then
-			unexpected(d);
-		end;
-		def k = readString(d, s);
-		expect(s, ":");
-		def v = read(s);
-		c[k] = v;
-		return readHash(c, s);
+		return readInNum(c, s, r, k);
 	end;
 	
-	def readArray(c, s)
-		def first = false;
-		if c.is(String) then
-			c = [];
-			first = true;
+	def readInNum(c, s, r, k)
+		def f;
+		if digits.contains(c) then
+			f = readInNum;
+		elif c == "." then
+			f = readFrac;
+		elif "eE".contains(c) then
+			f = readExp;
+		else
+			return k(c, r.toInt());
 		end;
-		def d = readChar(s);
-		if d = "]" then
-			return c;
-		elif (d == "," && first) || (d != "," && !first) then
-			unexpected(d);
-		end;
-		c.add(read(s));
-		return readArray(c, s);
+		return f(readChar(s), s, r+c, k);
 	end;
 	
-	def readString(c, s)
-		if c != "\"" then
-			unexpected(c);
+	def readFrac(c, s, r, k)
+		def f;
+		if digits.contains(c) then
+			f = readFrac;
+		elif "eE".contains(c) then
+			f = readExp;
+		else
+			return k(c, r.toFloat());
 		end;
-		def d = readChar(s);
-		if d == "\"" then
-			return c.unquote();
-		end;
-		c = c + d;
-		elif d == "\\" then
-			return readString(c + readChar(s), s);
-		end;
-		return readString(c, s);
+		return f(readChar(s), s, r+c, k);
 	end;
 	
-	def readVal(n, v) = fn(c, s)
-		n.split().each(fn(d)
-			if c != d then
-				unexpected(c);
-			end;
-			c = readChar();
-		end);
-		return v;
+	def readExp(c, s, r, k)
+		if "+-".contains(c) then
+			r = r + c;
+			c = readChar(s);
+		end;
+		return readInExp(c, s, r, k);
 	end;
-	
-	def readNum(c, s)
 		
+	def readInExp(c, s, r, k)
+		def f;
+		if digits.contains(c) then
+			f = readExp;
+		else
+			return k(c, r.toFloat());
+		end;
+		return f(readChar(s), s, r+c, k);
 	end;
 	
-	def jsonlex = {
-		"{": readHash,
-		"[": readArray,
-		"\"": readString,
-		"t": readval("true", true),
-		"f": readval("false", false),
-		"n", readval("null", nil),
-		"-", readNum
-	}
-	for(0, 10, fn(i)
-		jsonlex[i.toString()] = readNum;
+	def readStr(c, s, r, k)
+		expect(c, "\"");
+		r = r + c;
+		return readInStr(readChar(s), s, r, k);
+	end;
+	
+	def readInStr(c, s, r, k)
+		r = r + c;
+		if c == "\"" then
+			return k(readChar(s), r.unquote());
+		elif c == "\\" then
+			r = r + readChar(s);
+		end;
+		return readInStr(readChar(s), s, r, k);
+	end;
+	
+	def readArr(c, s, r, k)
+		expect(c, "[");
+		return readInArr(readChar(s), s, [], k);
+	end;
+	
+	def readInArr(c, s, r, k)
+		c = skipSpace(c, s);
+		if c == "]" then
+			return k(readChar(s), r);
+		end;
+		return dispatch(c, s, fn(c, ret)
+			expect(skipSpace(c, s), ",");
+			r.add(ret);
+			return readInArr(readChar(s), s, r, k);
+		end);
+	end;
+	
+	def readDict(c, s, r, k)
+		expect(c, "{");
+		return readInDict(readChar(s), s, {}, k);
+	end;
+	
+	def readInDict(c, s, r, k)
+		c = skipSpace(c, s);
+		if c == "}" then
+			return k(readChar(s), r);
+		end;
+		return readStr(c, s, "", fn(c, name)
+			expect(skipSpace(c, s), ":");
+			c = skipSpace(readChar(s), s);
+			return dispatch(c, s, fn(c, val)
+				expect(skipSpace(c, s), ",");
+				r[name] = val;
+				return readInDict(readChar(s), s, r, k);
+			end);
+		end);
+	end;
+	
+	def readBuiltin(name, val)
+		def next(c, s, r, k)
+			if over.contains(c) then
+				if r != name then
+					throw(unknown(r));
+				end;
+				return k(c, val);
+			end;
+			return next(readChar(s), s, r+c, k);
+		end;
+		return next;
+	end;
+	
+	def lexers = {
+		"\"": readStr,
+		"[": readArr,
+		"{": readDict,
+		"t": readBuiltin("true", true),
+		"f": readBuiltin("false", false),
+		"n": readBuiltin("null", nil),
+		"-": readNum
+	};
+	digits.split().each(fn(c)
+		lexers[c] = readNum;
 	end);
 	
-	def read(s)
-		def c = read1stChar(s);
-		def f = jsonlex[c];
-		if !f then
-			throw("unexpected character: " + c);
+	def dispatch(c, s, k)
+		def p = lexers[c];
+		if !p then
+			throw(unexpected(c));
 		end;
-		return f(c, s);
+		return p(c, s, "", k);
 	end;
+	
+	def parse(s) = dispatch(readChar(s), s, fn(c, r) = r);
 	
 end;
 

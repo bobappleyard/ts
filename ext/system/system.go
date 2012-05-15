@@ -15,12 +15,6 @@ func init() {
 func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
 	var File, Stream *ts.Class
 
-	data := itpr.Import("data")
-	text := itpr.Import("text")
-	Mixin := data.Get(itpr.Accessor("Mixin"))
-	utf8 := text.Get(itpr.Accessor("utf8"))
-	readAll := text.Get(itpr.Accessor("readAll"))
-	
 	newStream := func(x interface{}) *ts.Object {
 		s := Stream.New()
 		s.SetUserData(x)
@@ -54,9 +48,6 @@ func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
 			}
 			return newStream(fl)
 		}),
-		ts.MSlot("text", func(o *ts.Object) *ts.Object {
-			return File.Call(o, 1, readAll)
-		}),
 		ts.MSlot("write", func(o, f *ts.Object) *ts.Object {
 			fl, err := os.Create(File.Get(o, 0).ToString())
 			if err != nil {
@@ -77,7 +68,8 @@ func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
 		}),
 	})
 	
-	Stream = ts.ObjectClass.Extend(itpr, "Stream", ts.UserData, []ts.Slot {
+	sFlags := ts.UserData | ts.Final
+	Stream = ts.ObjectClass.Extend(itpr, "Stream", sFlags, []ts.Slot {
 		ts.MSlot("readBuffer", func(o, b *ts.Object) *ts.Object {
 			buf := b.ToBuffer()
 			r := o.UserData().(io.Reader)
@@ -111,8 +103,6 @@ func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
 			return ts.Nil
 		}),
 	})
-	Stream = Mixin.Call(nil, utf8, Stream.Object()).ToClass()
-	Stream.SetFlag(ts.Final)
 
 	env := map[*ts.Object]*ts.Object {}
 	for _, x := range os.Environ() {

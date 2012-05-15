@@ -646,7 +646,7 @@ func (u *Unit) compileClass(n *Node, e compilerCtx) {
 	}
 	i, l := 1, 0
 	for _, x := range spec {
-		if es[i].Kind == Property {
+		if es[i].Flags.Kind() == Property {
 			if x.Child[0] == nil {
 				e.write(VALUE, 0)
 			} else {
@@ -661,7 +661,7 @@ func (u *Unit) compileClass(n *Node, e compilerCtx) {
 			e.write(VALUE, 0)
 		} else {
 			u.compileNode(x, e)
-			if es[i].Kind == Method || es[i].Kind == Property {
+			if k := es[i].Flags.Kind(); k == Method || k == Property {
 				(*e.block)[len(*e.block)-3] = CLOSEM
 			}
 		}
@@ -699,8 +699,7 @@ func (u *Unit) compileSpec(n *Node, e compilerCtx) ([]string, []Slot, []*Node) {
 			}
 			t := x.Child[0].Token
 			es = append(es, Slot {
-				Kind: k, 
-				Vis: x.Data.(SlotVis),
+				Flags: Flags(k, x.Data.(SlotVis)),
 				access: uint16(u.getAccessor(t.Text)),
 				next: uint16(e.static(t.Text)),
 			})
@@ -710,7 +709,7 @@ func (u *Unit) compileSpec(n *Node, e compilerCtx) ([]string, []Slot, []*Node) {
 	checkUniq(names)
 	for i, x := range e.class {
 		es = append(es, Slot{
-			Kind: Marker,
+			Flags: Flags(Marker, Private),
 			access: uint16(u.getAccessor(x)),
 			next: uint16(i),
 		})
