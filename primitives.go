@@ -150,7 +150,7 @@ func Wrap(x interface{}) *Object {
 		}
 		res := make(map[interface{}] *Object)
 		for k, v := range v {
-			res[keyData(k)] = v
+			res[keyData([]*Object{k})] = v
 		}
 		return new(hashObj).init(res)
 	case map[interface{}] *Object:
@@ -948,7 +948,19 @@ func classScanNames(c *Class, in map[string] bool, hook, deep bool) {
 	}
 }
 
-func keyData(o *Object) interface{} {
+type keyList struct {
+	cur, next interface{}
+}
+
+func keyData(xs []*Object) interface{} {
+	res := objKeyData(xs[0])
+	for _, x := range xs[1:] {
+		res = keyList{objKeyData(x), res}
+	}
+	return res
+}
+
+func objKeyData(o *Object) interface{} {
 	switch o.c {
 	case StringClass:
 		return o.ToString()
@@ -1484,15 +1496,17 @@ func initCollectionClasses() {
 			res += "}"
 			return Wrap(res)
 		}),
-		MSlot("__aget__", func(o, k *Object) *Object {
-			res := o.ToHash()[keyData(k)]
+		MSlot("__aget__", func(o *Object, args []*Object) *Object {
+			res := o.ToHash()[keyData(args)]
 			if res == nil {
 				res = False
 			}
 			return res
 		}),
-		MSlot("__aset__", func(o, k, v *Object) *Object {
-			o.ToHash()[keyData(k)] = v
+		MSlot("__aset__", func(o *Object, args []*Object) *Object {
+			v := args[len(args)-1]
+			args = args[:len(args)-1]
+			o.ToHash()[keyData(args)] = v
 			return Nil
 		}),
 		PropSlot("size", func(o *Object) *Object {
