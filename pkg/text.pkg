@@ -1,7 +1,7 @@
 package text
 	import data;
 	
-	export Utf8Stream,
+	export utf8, Utf8Stream,
 	       read, print,
 	       writeString, readAll, readWord,
 	       readUntil, readUntilWord;

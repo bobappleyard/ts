@@ -1439,9 +1439,9 @@ func initCollectionClasses() {
 			}
 			return Wrap(res)
 		}),
-		MSlot("reduce", func(o, f, acc *Object) *Object {
+		MSlot("reduce", func(o, acc, f *Object) *Object {
 			for _, x := range o.ToArray() {
-				acc = f.Call(nil, x, acc)
+				acc = f.Call(nil, acc, x)
 			}
 			return acc
 		}),
