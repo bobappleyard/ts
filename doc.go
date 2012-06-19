@@ -63,12 +63,13 @@ The logical operators "&&" (and) and "||" (or) are provided.
 	false && true   // false
 	false || false  // false
 
-These operator have short-circuiting. This means that if the value of the 
+These operators have short-circuiting. This means that if the value of the 
 expression can be determined after evaluating the left operand, the right 
 operand is not evaluated.
 
 There is "nil", which represents no value. This is primarily used as the return 
-value of functions and methods that are only called for their side effects.
+value of functions and methods that are only called for their side effects, as
+well as for uninitialised fields and variables.
 
 Strings have the usual C-like syntax: enclosed in speech marks with "\" for
 escape sequences.
@@ -188,10 +189,7 @@ Here <function> means an expression that evaluates to a function.
 
 e.g.
 
-	def f(x)
-		print(x);
-	end;
-	f(5);
+	print(5);
 
 Prints "5".
 
