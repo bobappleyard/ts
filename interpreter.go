@@ -8,7 +8,6 @@ import (
 	"strings"
 	"encoding/binary"
 	. "github.com/bobappleyard/ts/bytecode"
-	"github.com/bobappleyard/readline"
 )
 
 /*******************************************************************************
@@ -138,27 +137,7 @@ func New() *Interpreter {
 
 // Start a prompt that reads expressions from stdin and prints them to stdout.
 // Swallows and prints all errors.
-func (i *Interpreter) Repl() {
-	readline.SetWordBreaks(" \t\n\"\\+-*/><=!:;|&[{()}].")
-	readline.Completer = func(query, ctx string) []string {
-		var src, res []string
-		p := len(ctx)-len(query)-1
-		if p > 0 && ctx[p] == '.' {
-			for k, v := range i.a {
-				if len(v.e) != 0 {
-					src = append(src, k)
-				}
-			}
-		} else {
-			src = i.ListDefined()
-		}
-		for _, x := range src {
-			if strings.HasPrefix(x, query) {
-				res = append(res, x)
-			}
-		}
-		return res
-	}
+func (i *Interpreter) Repl(input func() io.Reader, save func(string)) {
 	for {
 		if func() bool {
 			defer func() {
@@ -167,13 +146,13 @@ func (i *Interpreter) Repl() {
 				}
 			}()/**/
 			u := new(Unit)
-			r := readline.Reader()
+			r := input()
 			if _, e := r.Read(nil); e == io.EOF {
 				return true
 			}
 			l := NewScanner(r, "stdin")
 			if u.CompileStmt(l) {
-				readline.AddHistory(strings.Replace(l.Scanned(), "\n", "", -1))
+				save(strings.Replace(l.Scanned(), "\n", "", -1))
 				x := i.Exec(u)
 				if x != Nil {
 					fmt.Printf("\033[36m%s\033[0m\n", x)
@@ -231,11 +210,23 @@ func (i *Interpreter) Defined(n string) bool {
 	return b.c == boxClass
 }
 
+// List the global variables
 func (i *Interpreter) ListDefined() []string {
 	res := []string{}
 	for n, v := range i.o {
 		if v.c == boxClass {
 			res = append(res, n)
+		}
+	}
+	return res
+}
+
+// List the available accessors.
+func (i *Interpreter) ListAccessors() []string {
+	res := []string{}
+	for k, v := range i.a {
+		if len(v.e) != 0 {
+			res = append(res, k)
 		}
 	}
 	return res
