@@ -1214,7 +1214,7 @@ func writeString(w io.Writer, s string) {
 
 func readHeader(r io.Reader) (header []uint16, ok bool) {
 	defer func() {
-		recover();
+		recover()
 		ok = false
 	}()
 	header = readBlock(r, hSize)
