@@ -620,7 +620,7 @@ func (u *Unit) addSlot(c *Class, e *Slot) {
 		if c.Is(f.Class) {
 			// shadowing is where a name is defined that has already been
 			// defined in an ancestor class, and this definition is 
-			// incompatible
+			// not an override.
 			if kind != f.Flags.Kind() || vis == Private {
 				panic(fmt.Errorf("cannot shadow %s.%s", f.Class.n, e.Name))
 			}
@@ -634,7 +634,11 @@ func (u *Unit) addSlot(c *Class, e *Slot) {
 			return
 		}
 	}
-	// if no previous defitions to override, add a new one
+	// don't bother with private members on anonymous parents; just wastes space
+	if c.FlagSet(Anon) && vis == Private {
+		return
+	}
+	// add a new definition
 	e.offset = uint16(len(t))
 	e.Class = c
 	t = append(t, e.Value)
