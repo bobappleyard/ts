@@ -62,9 +62,7 @@ Read more
 ---------
 
 Running godoc will give you a run-down of the functions, types etc defined by
-the distribution. Peruse the doc directory for information on programming in
-Transcript, extending the language and embedding the language into your
-programs.
+the distribution.
 
 Version History
 ---------------
