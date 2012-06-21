@@ -760,6 +760,11 @@ func (p *process) init() *process {
 }
 
 func (p *process) run() {
+	defer func() {
+		if e := recover(); e != nil {
+			panic(p.wrapError(e))
+		}
+	}()
 	for int(p.p) < len(p.c) {
 		p.step()
 	}
@@ -902,10 +907,7 @@ func (p *process) finish(n int) {
 }
 
 func (p *process) prolog(n, m int, rest bool) {
-	if p.n < n {
-		 panic(fmt.Errorf("wrong number of arguments %d", p.n))
-	}
-	if !rest && p.n > m {
+	if p.n < n || (!rest && p.n > m) {
 		 panic(fmt.Errorf("wrong number of arguments %d", p.n))
 	}
 	for i := p.n; i < m; i++ {
@@ -945,11 +947,6 @@ func (p *process) wrapError(err interface{}) *Object {
 }
 
 func (p *process) step() {
-	defer func() {
-		if e := recover(); e != nil {
-			panic(p.wrapError(e))
-		}
-	}()
 	op := p.next()
 	switch op {
 	case NOP:
