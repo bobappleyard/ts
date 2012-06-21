@@ -1,6 +1,5 @@
 package data
-	export Codec, Mixin, Stream, Translation,
-	       readAll, copyStream;
+	export Codec, Stream, readAll, copyStream;
 	
 	class Codec()
 		def create(read, write)
