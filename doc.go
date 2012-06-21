@@ -246,7 +246,7 @@ In the former case, it is as if
 
 	fn (<args>) return <expr>; end
 
-had been written instead. See below for a description of what "return" does.
+had been written instead.
 
 Functions may return values using the "return" statement.
 
@@ -269,9 +269,7 @@ e.g.
 			return for(i+1, t, f);
 		end;
 	end;
-	for(0, 10, fn(i)
-		print(i);
-	end);
+	for(0, 10, fn(i) = print(i));
 
 Prints "0" to "9" on consecutive lines. When "for" calls itself, the stack 
 remains where it is. This is exactly equivalent to a "for loop" in many other
@@ -384,6 +382,59 @@ e.g.
 	print(f());
 
 Prints "1".
+
+Packages and Programs
+
+Evaluation of programs is controlled by the client of the library. In the
+default interpreter (https://github.com/bobappleyard/tsi) programs are a series
+of top-level statements that are evaluated in the order they appear in the 
+source file. A different approach may be preferred if TranScript is being used 
+to extend a program.
+
+Packages provide a mechanism for collecting code together into a namespace so
+that it may be re-used by programs. To use a package, use the "import"
+statement.
+
+	import <package names>
+
+Here <package names> consists of a list of <package name> separated with commas,
+where <package name> is a list of <name> separated with dots.
+
+e.g.
+
+	import system;
+	import my.big.long.package.name;
+	import a, b, system; 
+
+This creates a variable in the scope that the "import" appears, and is an object
+containing all the exported definitions of the package as attributes.
+
+To define a package, use the "package" statemtent.
+
+	package <package name>
+		<package body>
+	end;
+
+Here <package body> is a <body> where "export" statements may appear.
+
+	export <names>
+
+Where <names> is a list of <name> separated with commas. These should refer to
+variables and functions defined within the package. Anything that has not been
+exported is private to the package.
+
+Packages need to be placed in the package path to be visible to the system. This
+defaults to
+
+	$(GOROOT)/src/pkg/github.com/bobappleyard/ts/pkg
+
+but may be changed. Note that multiple paths separated by ":" may be used.
+
+The directory containing the source file issuing the import request will also
+be searched.
+
+Packages are only loaded and evaluated once during the lifetime of the
+interpreter.
 
 */
 package ts
