@@ -787,7 +787,7 @@ func (i *Interpreter) lookup(n string) *Object {
 
 func (p *process) parseArgs(vars... **Object) {
 	if p.n != len(vars) {
-		 panic(fmt.Errorf("wrong number of arguments %d", p.n))
+		 panic(ArgError(p.n))
 	}
 	for i, x := range p.s[p.b:] {
 		*vars[i] = x

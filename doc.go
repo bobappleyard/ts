@@ -231,7 +231,7 @@ e.g.
 		if more then
 			g = compose.apply([g, more] + rest);
 		end;
-		return f(g(x));
+		return fn(x) = f(g(x));
 	end;
 
 <body> is either "=" followed by an expression, or a block terminated with 

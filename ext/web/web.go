@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	ts.RegisterExtension("@web", pkg)
+	ts.RegisterExtension("web", pkg)
 }
 
 func inputVars(r *http.Request) *ts.Object {

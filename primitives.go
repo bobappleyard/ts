@@ -8,7 +8,6 @@ import (
 	"os"
 	"regexp"
 	"unicode/utf8"
-	"path"
 )
 
 /*******************************************************************************
@@ -23,6 +22,7 @@ var ObjectClass *Class
 // Primitive data types. The normal operations on classes (extension, creation)
 // do not work on these classes.
 var ClassClass, AccessorClass, NilClass, BooleanClass, TrueClass, FalseClass,
+	CollectionClass, SequenceClass, IteratorClass, sequenceIteratorClass,
     StringClass, NumberClass, IntClass, FltClass, FunctionClass, ArrayClass,
     HashClass, ErrorClass, BufferClass,
     frameClass, skeletonClass, boxClass, undefinedClass *Class
@@ -34,9 +34,8 @@ func init() {
 	initBaseClasses()
 	initSimpleClasses()
 	initNumberClasses()
-	initDataClasses()
-	initCache()
 	initCollectionClasses()
+	initCache()
 }
 
 // cache what are likely to be frequently used values
@@ -308,10 +307,12 @@ func RegisterExtension(n string, f func(*Interpreter) map[string] *Object) {
 	extensions[n] = f
 }
 
-func loadExtension(n string,
-                    f func(*Interpreter) map[string] *Object,
-                    itpr *Interpreter) *Object {
+func loadExtension(n string, itpr *Interpreter) *Object {
 	es := []Slot{}
+	f := extensions[n]
+	if f == nil {
+		panic("undefined extension: " + n)
+	}
 	for k, v := range f(itpr) {
 		es = append(es, Slot{Name: k, Flags: Flags(Field, Public), Value: v})
 	}
@@ -321,25 +322,6 @@ func loadExtension(n string,
 func fileExists(path string) bool {
 	_, e := os.Stat(path)
 	return e == nil
-}
-
-func loadPackageFile(name string, pathspec, file *Object, i *Interpreter) {
-	name = strings.Replace(name, ".", "/", -1)
-	paths := strings.Split(pathspec.ToString(), ":")
-	if file != False {
-		p := file.ToString()
-		if strings.Index(p, "/") != -1 {
-			dir := path.Dir(p)
-			paths = append([]string{dir}, paths...)
-		}
-	}
-	for _, x := range paths {
-		n := x + "/" + name + ".pkg"
-		if fileExists(n) {
-			i.Load(n)
-			return
-		}
-	}
 }
 
 const (
@@ -360,63 +342,14 @@ func root() string {
 
 // registration function called by New()
 func definePrimitives(i *Interpreter) {
-	pathField := i.Accessor("path")
-	loaded := map[string] *Object{}
-	pmClass := ObjectClass.extend("PackageManager", 0, []Slot {
-		FSlot("path", root() + "/pkg"),
-		MSlot("copy", func(o *Object) *Object {
-			return o;
-		}),
-		MSlot("unload", func(o, nm *Object) *Object {
-			delete(loaded, nm.String())
-			return Nil
-		}),
-		Slot {
-			Name: "__aget__",
-			Flags: Flags(Method, Public),
-			Value: new(funcObj).init(func(p *process) {
-				p.b = len(p.s) - p.n
-				var nm *Object
-				p.parseArgs(&nm)
-				name := nm.ToString()
-				// already loaded
-				if pkg := loaded[name]; pkg != nil {
-					p.ret(pkg)
-					return
-				}
-				// defined as an extension
-				if f := extensions[name]; f != nil {
-					loaded[name] = loadExtension(name, f, i)
-				} else {
-				// written in TranScript
-					loadPackageFile(name, p.t.Get(pathField), p.file, i)
-				}
-				if pkg := loaded[name]; pkg != nil {
-					p.ret(pkg)
-					return
-				}
-				panic(fmt.Errorf("package improperly defined: %s", name))
-			}),
-		},
-		MSlot("__aset__", func(o, i, x *Object) *Object {
-			loaded[i.ToString()] = x
-			return Nil		
-		}),	
-	})
-	var pkgClass *Class
-	pkgClass = ObjectClass.extend("Package", 0, []Slot{
-		PropSlot("name", func(o *Object) *Object {
-			return Wrap(o.c.n)
-		}, Nil),
-	})
 	
 	AccessorClass.n = ""
 	cs := []*Class {
 		ObjectClass, ClassClass, FunctionClass, AccessorClass,
 		BooleanClass, TrueClass, FalseClass, NilClass,
-		NumberClass, IntClass, FltClass,
+		NumberClass, IntClass, FltClass, CollectionClass, SequenceClass,
+		IteratorClass, sequenceIteratorClass,
 		StringClass, ArrayClass, HashClass, BufferClass,
-		pmClass, pkgClass,
 		ErrorClass,
 	}
 	for _, x := range cs {
@@ -441,10 +374,7 @@ func definePrimitives(i *Interpreter) {
 		}),
 	})
 	i.Define("Accessor", accClass.o)
-		
-	i.Define("packages", pmClass.alloc())
-	pmClass.flags = Final|Primitive
-
+	
 	i.Define("load", Wrap(func(o, p *Object) *Object {
 		i.Load(p.ToString())
 		return Nil
@@ -474,7 +404,7 @@ func definePrimitives(i *Interpreter) {
 			code = args[0].ToInt()
 		case 0:
 		default:
-			 panic(fmt.Errorf("wrong number of arguments %d", len(args)))
+			 panic(ArgError(len(args)))
 		}
 		os.Exit(code)
 		return Nil
@@ -498,6 +428,10 @@ func definePrimitives(i *Interpreter) {
 	}))
 	
 	i.Define("done", Done)
+	
+	i.Define("loadExtension", Wrap(func(o, n *Object) *Object {
+		return loadExtension(n.ToString(), i)
+	}))
 }
 
 /*******************************************************************************
@@ -761,7 +695,7 @@ func initBaseClasses() {
 		}),
 		MSlot("__callFailed__", func(o *Object, args []*Object) *Object {
 			if len(args) < 1 {
-				 panic(fmt.Errorf("wrong number of arguments %d", len(args)))
+				 panic(ArgError(len(args)))
 			}
 			a := args[0].accessorData()
 			panic(fmt.Errorf("undefined: %s.%s", o.c.n, a.n))
@@ -772,9 +706,6 @@ func initBaseClasses() {
 		MSlot("equals", func(o, x *Object) *Object {
 			return ObjectClass.Call(o, _Object_eq, x)
 		}),
-		PropSlot("type", func(o *Object) *Object {
-			return o.c.o
-		}, Nil),
 		MSlot("copy", func(o *Object) *Object {
 			f := make([]*Object, len(o.f))
 			copy(f, o.f)
@@ -784,7 +715,7 @@ func initBaseClasses() {
 			return o.Call(nil, args.ToArray()...)
 		}),
 		MSlot("is", func(o, d *Object) *Object {
-			c := ObjectClass.Get(o, _Object_type).ToClass()
+			c := o.Class()
 			return Wrap(c.Is(d.ToClass()))
 		}),
 		MSlot("__neq__", func(o, x *Object) *Object {
@@ -792,6 +723,10 @@ func initBaseClasses() {
 		}),
 		MSlot("__inv__", func(o *Object) *Object {
 			return False
+		}),
+		MSlot("slotNames", func(o *Object, flags []*Object) *Object {
+			c := o.Class()
+			return Wrap(c.Names(parseNamesFlags(flags)))
 		}),
 	}
 	
@@ -804,8 +739,6 @@ func initBaseClasses() {
 		}),
 	})
 	Nil = &Object{c: NilClass}
-	
-	ObjectClass.e[_Object_type].Set = Nil
 
 	ClassClass.e = []Slot {
 		FSlot("help", False),
@@ -826,12 +759,9 @@ func initBaseClasses() {
 		PropSlot("ancestor", func(o *Object) *Object {
 			return o.ToClass().a.o
 		}, Nil),
-		MSlot("names", func(o, flags *Object) *Object {
+		MSlot("slotNames", func(o *Object, flags []*Object) *Object {
 			c := o.ToClass()
-			s := flags.ToString()
-			hook := strings.Index(s, "+") != -1
-			deep := strings.Index(s, "*") != -1
-			return Wrap(c.Names(hook, deep))
+			return Wrap(c.Names(parseNamesFlags(flags)))
 		}),
 		MSlot("info", func(o *Object) *Object {
 			c := o.ToClass()
@@ -915,6 +845,19 @@ func initBaseClasses() {
 
 }
 
+func parseNamesFlags(flags []*Object) (hook, deep bool) {
+	switch len(flags) {
+	case 0:
+		return false, false
+	case 1:
+		s := flags[0].ToString()
+		hook = strings.Index(s, "+") != -1
+		deep = strings.Index(s, "*") != -1
+		return
+	}
+	panic(ArgError(len(flags)))
+}
+
 func (c *Class) Names(hook, deep bool) []string {
 	in := map[string] bool{}
 	classScanNames(c, in, hook, deep)
@@ -926,23 +869,16 @@ func (c *Class) Names(hook, deep bool) []string {
 }
 
 func classScanNames(c *Class, in map[string] bool, hook, deep bool) {
-	if hook {
-		for _, x := range c.e {
-			if x.Flags.Vis() == Public {
-				in[x.Name] = true
-			}
+	for _, x := range c.e {
+		if !hook &&
+		   strings.HasPrefix(x.Name, "__") &&
+		   strings.HasSuffix(x.Name, "__") {
+		   continue
 		}
-	} else {
-		for _, x := range c.e {
-			if strings.HasPrefix(x.Name, "__") &&
-			   strings.HasSuffix(x.Name, "__") {
-			   continue
-			}
-			if x.Flags.Vis() == Public {
-				in[x.Name] = true
-			}
+		if x.Flags.Vis() == Public {
+			in[x.Name] = true
 		}
-	}	
+	}
 	if deep && c.a != nil {
 		classScanNames(c.a, in, hook, deep)
 	}
@@ -979,7 +915,7 @@ func trimString(args []*Object) string {
 	case 1:
 		return args[0].ToString()
 	}
-	panic(fmt.Errorf("wrong number of arguments %d", len(args)))
+	panic(ArgError(len(args)))
 }
 
 func initSimpleClasses() {
@@ -1009,122 +945,6 @@ func initSimpleClasses() {
 	BooleanClass.flags = Final|Primitive
 	TrueClass.flags = Final|Primitive
 	FalseClass.flags = Final|Primitive
-}
-
-func initDataClasses() {
-	StringClass = ObjectClass.extend("String", Final|Primitive, []Slot {
-		MSlot("copy", func(o *Object) *Object {
-			return o;
-		}),
-		MSlot("split", func(o *Object, args []*Object) *Object {
-			if len(args) > 1 {
-				 panic(fmt.Errorf("wrong number of arguments %d", len(args)))
-			}
-			sep := ""
-			if len(args) == 1 {
-				sep = args[0].ToString()
-			}
-			return Wrap(strings.Split(o.ToString(), sep))
-		}),
-		MSlot("toString", func(o *Object) *Object {
-			return o
-		}),
-		MSlot("toInt", func(o *Object) *Object {
-			i, err := strconv.Atoi(o.ToString())
-			if err != nil {
-				panic(err)
-			}
-			return Wrap(i)
-		}),
-		MSlot("toFloat", func(o *Object) *Object {
-			f, err := strconv.ParseFloat(o.ToString(), 64)
-			if err != nil {
-				panic(err)
-			}
-			return Wrap(f)
-		}),
-		MSlot("toNumber", func(o *Object) *Object {
-			i, err := strconv.Atoi(o.ToString())
-			if err != nil {
-				f, err := strconv.ParseFloat(o.ToString(), 64)
-				if err != nil {
-					panic(err)
-				}
-				return Wrap(f)
-			}
-			return Wrap(i)
-		}),
-		MSlot("startsWith", func(o, s *Object) *Object {
-			return Wrap(strings.HasPrefix(o.ToString(), s.ToString()))
-		}),
-		MSlot("endsWith", func(o, s *Object) *Object {
-			return Wrap(strings.HasSuffix(o.ToString(), s.ToString()))
-		}),
-		MSlot("contains", func(o, s *Object) *Object {
-			return Wrap(strings.Index(o.ToString(), s.ToString()) != -1)
-		}),
-		MSlot("matches", func(o, s *Object) *Object {
-			m, err := regexp.MatchString(s.ToString(), o.ToString())
-			if err != nil {
-				panic(err)
-			}
-			return Wrap(m)
-		}),
-		MSlot("subst", func(o *Object, args []*Object) *Object {
-			res := ""
-			i := 0
-			for _, c := range o.ToString() {
-				if c == '%' {
-					cur := args[i]
-					res += cur.String()
-					i++
-					continue
-				}
-				res += string(c)
-			}
-			return Wrap(res)
-		}),
-		PropSlot("size", func(o *Object) *Object {
-			return Wrap(utf8.RuneCountInString(o.ToString()))
-		}, Nil),
-		MSlot("trim", func(o *Object, args []*Object) *Object {
-			return Wrap(strings.Trim(o.ToString(), trimString(args)))
-		}),
-		MSlot("trimLeft", func(o *Object, args []*Object) *Object {
-			return Wrap(strings.TrimLeft(o.ToString(), trimString(args)))
-		}),
-		MSlot("trimRight", func(o *Object, args []*Object) *Object {
-			return Wrap(strings.TrimRight(o.ToString(), trimString(args)))
-		}),
-		MSlot("quote", func(o *Object) *Object {
-			return Wrap(strconv.Quote(o.ToString()))
-		}),
-		MSlot("unquote", func(o *Object) *Object {
-			s, err := strconv.Unquote(o.ToString())
-			if err != nil {
-				panic(err)
-			}
-			return Wrap(s)
-		}),
-		MSlot("charCode", func(o *Object) *Object {
-			r, _ := utf8.DecodeRuneInString(o.ToString())
-			if r == utf8.RuneError {
-				panic(fmt.Errorf("malformed string"))
-			}
-			return Wrap(r)
-		}),
-		MSlot("__add__", func(o, s *Object) *Object {
-			res := Wrap(o.ToString() + s.ToString())
-			return res
-		}),
-		MSlot("__eq__", func(o, s *Object) *Object {
-			if s.c != StringClass {
-				return False
-			}
-			return Wrap(o.ToString() == s.ToString())
-		}),
-	})
-
 }
 
 func numG(fi func(a, b int) *Object,
@@ -1247,6 +1067,12 @@ func initNumberClasses() {
 		MSlot("__neg__", func(o *Object) *Object {
 			return Wrap(-o.ToInt())
 		}),
+		MSlot("quotient", func(o, x *Object) *Object {
+			return Wrap(o.ToInt() / x.ToInt())
+		}),
+		MSlot("modulo", func(o, x *Object) *Object {
+			return Wrap(o.ToInt() % x.ToInt())
+		}),
 	})
 	
 	FltClass = NumberClass.extend("Float", Final|Primitive, []Slot {
@@ -1284,9 +1110,9 @@ func setOp(a, b []*Object, op int) (ina, inb, inboth []*Object) {
 
 func initCollectionClasses() {
 	ErrorClass = ObjectClass.extend("Error", 0, []Slot {
-		FSlot("msg", ""),
-		FSlot("file", ""),
-		FSlot("line", 0),
+		FSlot("msg", Nil),
+		FSlot("file", Nil),
+		FSlot("line", Nil),
 		MSlot("toString", func(o *Object) *Object {
 			msg := ErrorClass.Get(o, 0)
 			file := ErrorClass.Get(o, 1)
@@ -1298,14 +1124,56 @@ func initCollectionClasses() {
 		}),
 		MSlot("create", func(o, msg *Object) *Object {
 			ErrorClass.Set(o, 0, msg)
+			ErrorClass.Set(o, 1, Wrap(""))
+			ErrorClass.Set(o, 2, Wrap(0))
+			
 			return Nil
 		}),
 	})
-
-	ArrayClass = ObjectClass.extend("Array", Final, []Slot {
+	
+	CollectionClass = ObjectClass.extend("Collection", Primitive, []Slot {
+		AbstractMethod("__aget__"),
+		AbstractMethod("__aset__"),
+		AbstractMethod("__iter__"),
+		PropSlot("size", Nil, Nil),		
+	})
+	IteratorClass = ObjectClass.extend("Iterator", Primitive, []Slot {
+		AbstractMethod("next"),
+		MSlot("__iter__", func(o *Object) *Object {
+			return o
+		}),
+	})
+	
+	SequenceClass = CollectionClass.extend("Sequence", Primitive, []Slot {
+		MSlot("__iter__", func(o *Object) *Object {
+			return sequenceIteratorClass.New(o)
+		}),
+	})
+	sequenceIteratorClass = IteratorClass.extend("", 0, []Slot {
+		PSlot("seq", Nil),
+		PSlot("idx", Nil),
+		MSlot("create", func(o, seq *Object) *Object {
+			sequenceIteratorClass.Set(o, 0, seq)
+			sequenceIteratorClass.Set(o, 1, Wrap(0))
+			return Nil
+		}),
+		MSlot("next", func(o *Object) *Object {
+			seq := sequenceIteratorClass.Get(o, 0)
+			idxo := sequenceIteratorClass.Get(o, 1)
+			idx := idxo.ToInt()
+			l := CollectionClass.Get(seq, 3).ToInt()
+			if idx < l {
+				sequenceIteratorClass.Set(o, 1, Wrap(idx+1))
+				return CollectionClass.Call(seq, 0, idxo)
+			}
+			return Done
+		}),
+	})
+	
+	ArrayClass = SequenceClass.extend("Array", Final, []Slot {
 		MSlot("join", func(o *Object, args []*Object) *Object {
 			if len(args) > 1 {
-				 panic(fmt.Errorf("wrong number of arguments %d", len(args)))
+				 panic(ArgError(len(args)))
 			}
 			sep := ""
 			if len(args) == 1 {
@@ -1392,7 +1260,7 @@ func initCollectionClasses() {
 				from = args[0].ToInt()
 			case 0:
 			default:
-				 panic(fmt.Errorf("wrong number of arguments %d", len(args)))
+				 panic(ArgError(len(args)))
 			}
 			return Wrap(t[from:to])
 		}),
@@ -1472,7 +1340,7 @@ func initCollectionClasses() {
 		}),
 	})
 	
-	HashClass = ObjectClass.extend("Hash", Final, []Slot {
+	HashClass = CollectionClass.extend("Hash", Final, []Slot {
 		MSlot("keys", func(o *Object) *Object {
 			res := []*Object{}
 			for k := range o.ToHash() {
@@ -1482,6 +1350,9 @@ func initCollectionClasses() {
 		}),
 		MSlot("__new__", func(o *Object) *Object {
 			return new(hashObj).init(nil)
+		}),
+		MSlot("__iter__", func(o *Object) *Object {
+			return sequenceIteratorClass.New(HashClass.Call(o, 0))
 		}),
 		MSlot("toString", func(o *Object) *Object {
 			res := "{"
@@ -1514,7 +1385,7 @@ func initCollectionClasses() {
 		}, Nil),
 	})
 	
-	BufferClass = ObjectClass.extend("Buffer", Final, []Slot {
+	BufferClass = SequenceClass.extend("Buffer", Final, []Slot {
 		MSlot("__new__", func(o, s *Object) *Object {
 			buf := make([]byte, s.ToInt())
 			return new(bufObj).init(buf)
@@ -1534,7 +1405,7 @@ func initCollectionClasses() {
 				from = args[0].ToInt()
 			case 0:
 			default:
-				 panic(fmt.Errorf("wrong number of arguments %d", len(args)))
+				 panic(ArgError(len(args)))
 			}
 			return Wrap(t[from:to])
 		}),
@@ -1542,6 +1413,9 @@ func initCollectionClasses() {
 			copy(a.ToBuffer(), b.ToBuffer())
 			return Nil
 		}),		
+		MSlot("toString", func(o *Object) *Object {
+			return Wrap(string(o.ToBuffer()))
+		}),
 		MSlot("__aget__", func(o, i *Object) *Object {
 			return Wrap(o.ToBuffer()[i.ToInt()])
 		}),
@@ -1555,6 +1429,155 @@ func initCollectionClasses() {
 			copy(res, bufa)
 			copy(res[len(bufa):], bufb)
 			return Wrap(res)
+		}),
+	})
+
+	StringClass = SequenceClass.extend("String", Final|Primitive, []Slot {
+		MSlot("copy", func(o *Object) *Object {
+			return o;
+		}),
+		MSlot("split", func(o *Object, args []*Object) *Object {
+			if len(args) > 1 {
+				 panic(ArgError(len(args)))
+			}
+			sep := ""
+			if len(args) == 1 {
+				sep = args[0].ToString()
+			}
+			return Wrap(strings.Split(o.ToString(), sep))
+		}),
+		MSlot("toString", func(o *Object) *Object {
+			return o
+		}),
+		MSlot("toInt", func(o *Object) *Object {
+			i, err := strconv.Atoi(o.ToString())
+			if err != nil {
+				panic(err)
+			}
+			return Wrap(i)
+		}),
+		MSlot("toFloat", func(o *Object) *Object {
+			f, err := strconv.ParseFloat(o.ToString(), 64)
+			if err != nil {
+				panic(err)
+			}
+			return Wrap(f)
+		}),
+		MSlot("toNumber", func(o *Object) *Object {
+			i, err := strconv.Atoi(o.ToString())
+			if err != nil {
+				f, err := strconv.ParseFloat(o.ToString(), 64)
+				if err != nil {
+					panic(err)
+				}
+				return Wrap(f)
+			}
+			return Wrap(i)
+		}),
+		MSlot("toBuffer", func(o *Object) *Object {
+			return Wrap([]byte(o.ToString()))
+		}),
+		MSlot("startsWith", func(o, s *Object) *Object {
+			return Wrap(strings.HasPrefix(o.ToString(), s.ToString()))
+		}),
+		MSlot("endsWith", func(o, s *Object) *Object {
+			return Wrap(strings.HasSuffix(o.ToString(), s.ToString()))
+		}),
+		MSlot("contains", func(o, s *Object) *Object {
+			return Wrap(strings.Index(o.ToString(), s.ToString()) != -1)
+		}),
+		MSlot("matches", func(o, s *Object) *Object {
+			m, err := regexp.MatchString(s.ToString(), o.ToString())
+			if err != nil {
+				panic(err)
+			}
+			return Wrap(m)
+		}),
+		MSlot("subst", func(o *Object, args []*Object) *Object {
+			res := ""
+			i := 0
+			inS := false
+			for _, c := range o.ToString() {
+				if c == '%' && inS {				
+					cur := args[i]
+					res += cur.String()
+					i++
+					continue
+				}
+				if c == '%' {
+					inS = true
+					continue
+				}
+				res += string(c)
+			}
+			if inS {
+				cur := args[i]
+				res += cur.String()
+			}
+			return Wrap(res)
+		}),
+		MSlot("replace", func(o, from, to *Object) *Object {
+			s := strings.Replace(o.ToString(), from.ToString(), to.ToString(), -1)
+			return Wrap(s)
+		}),
+		PropSlot("size", func(o *Object) *Object {
+			return Wrap(utf8.RuneCountInString(o.ToString()))
+		}, Nil),
+		MSlot("trim", func(o *Object, args []*Object) *Object {
+			return Wrap(strings.Trim(o.ToString(), trimString(args)))
+		}),
+		MSlot("trimLeft", func(o *Object, args []*Object) *Object {
+			return Wrap(strings.TrimLeft(o.ToString(), trimString(args)))
+		}),
+		MSlot("trimRight", func(o *Object, args []*Object) *Object {
+			return Wrap(strings.TrimRight(o.ToString(), trimString(args)))
+		}),
+		MSlot("quote", func(o *Object) *Object {
+			return Wrap(strconv.Quote(o.ToString()))
+		}),
+		MSlot("unquote", func(o *Object) *Object {
+			s, err := strconv.Unquote(o.ToString())
+			if err != nil {
+				panic(err)
+			}
+			return Wrap(s)
+		}),
+		MSlot("charCode", func(o *Object) *Object {
+			r, _ := utf8.DecodeRuneInString(o.ToString())
+			if r == utf8.RuneError {
+				panic(fmt.Errorf("malformed string"))
+			}
+			return Wrap(r)
+		}),
+		MSlot("__add__", func(o, s *Object) *Object {
+			res := Wrap(o.ToString() + s.ToString())
+			return res
+		}),
+		MSlot("__eq__", func(o, s *Object) *Object {
+			if s.c != StringClass {
+				return False
+			}
+			return Wrap(o.ToString() == s.ToString())
+		}),
+		MSlot("__aget__", func(o, _idx *Object) *Object {
+			s := o.ToString()
+			idx := _idx.ToInt()
+			var res rune
+			if idx < 0 {
+				panic(fmt.Errorf("runtime error: index out of range"))
+			}
+			for i := 0; i <= idx; i++ {
+				if len(s) == 0 {
+					panic(fmt.Errorf("runtime error: index out of range"))
+				}
+				r, n := utf8.DecodeRuneInString(s)
+				if r == utf8.RuneError {
+					panic(fmt.Errorf("malformed string"))
+				}
+				res = r
+				s = s[n:]
+			}
+			return Wrap(string(res))
 		}),
 	})
 }

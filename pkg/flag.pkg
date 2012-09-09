@@ -7,7 +7,7 @@ package flag
 	end;
 	
 	def printUsage = fn(spec)
-		spec.type.names("").each(fn(x)
+		spec.slotNames("").each(fn(x)
 			def s = Accessor(x).get(spec);
 			print("-%: %".subst(x, s[1]));
 		end);
@@ -21,7 +21,7 @@ package flag
 
 	def parse(spec)
 		def res = spec.copy(), inOpts = true;
-		res.type.names("").each(fn(x)
+		res.slotNames("").each(fn(x)
 			Accessor(x).set(res, false);
 		end);
 		def step(i)

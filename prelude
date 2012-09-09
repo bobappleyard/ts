@@ -1,25 +1,116 @@
 // The part of the standard library implemented in TranScript.
 
-// Basic iterative constructs.
+// Iteration
+// =========
+//
+// An iterable supports one method: __iter__() that returns an iterator.
+//
+// An iterator supports two methods: __iter__() that returns itself and next()
+// that moves the iterator onwards, returning the next item, or done if there
+// are no more items.
 
-def loop(f)
-	f();
-	return loop(f);
-end;
-
-def while(f)
-	if f() then
-		return while(f);
-	end;
-end;
-
-def for(from, to, f)
-	if from < to then
-		if !f(from) then
-			return;
+// Call a function for every item in an iterable. That function may return done,
+// so halting iteration.
+def for(it, f)
+	it = it.__iter__();
+	def step()
+		def x = it.next();
+		if x != done then
+			if f(x) != done then
+				return step();
+			end;
 		end;
-		return for(from + 1, to, f);
 	end;
+	return step();
+end;
+
+// Turn a function into an iterator.
+class FnIterator(Iterator)
+	def create(f)
+		this.f = f;
+	end;
+	def next() = this.f();
+	def copy() = this;
+private
+	def f;
+end;
+
+// Create an iterator composed of the return values of applying a function to
+// each item in a source iterable.
+def map(it, f)
+	it = it.__iter__();
+	return FnIterator(fn()
+		def x = it.next();
+		if x != done then
+			return f(x);
+		end;
+		return done;
+	end);
+end;
+
+def reduce(it, acc, f)
+	for(it, fn(x)
+		acc = f(x, acc);
+	end);
+	return acc;
+end;
+
+// Create an iterator composed of all the items in an iterable that pass a
+// criterion function.
+def filter(it, f)
+	it = it.__iter__();
+	def check()
+		def x = it.next();
+		if x == done then
+			return done;
+		end;
+		if f(x) then
+			return x;
+		end;
+		return check();
+	end;
+	return FnIterator(fn()
+		return check();
+	end);
+end;
+
+// Find the first item in an iterable that passes a criterion function, or false
+// if no items match.
+def find(it, f)
+	def res = filter(it, f).next();
+	if res == done then
+		return false;
+	end;
+	return res;
+end;
+
+// Create an iterator composed of a series of iterables. When one iterator
+// signals it is at an end by returning done, the next iterable is used. When no
+// more iterables remain, append returns done.
+def append(it, rest*)
+	it = it.__iter__();
+	def next()
+		def x = it.next();
+		if x == done then
+			if rest.size == 0 then
+				return done;
+			end;
+			it = rest[0].__iter__();
+			rest = rest.slice(1);
+			return next();
+		end;
+		return x;
+	end;
+	return FnIterator(fn()
+		return next();
+	end);
+end;
+
+// Turn an iterator into an array.
+def slurp(it)
+	def res = [];
+	for(it, fn(x) = res.add(x));
+	return res;
 end;
 
 // Rearrange arrays so that rows become columns.
@@ -35,9 +126,9 @@ def zip(as*)
 		throw(Error("infinite range"));
 	end;
 	def res = Array(rlen);
-	for(0, rlen, fn(i)
+	for(Range(rlen), fn(i)
 		def a = Array(alen);
-		for(0, alen, fn(j)
+		for(Range(alen), fn(j)
 			a[j] = as[j][i];
 		end);
 		res[i] = a;
@@ -45,16 +136,11 @@ def zip(as*)
 	return res;
 end;
 
-// Map like in Scheme.
-def map(f, ls*)
-	return zip.apply(ls).map(f.apply);
-end;
-
 // Represent a range of numbers as if it were an array.
 class Range()
 	def create(from, to?)
-		this.from = from;
-		this.to = to;
+		this.from = (to && from) || 0;
+		this.to = to || from;
 	end;
 	def size get()
 		if this.to then
@@ -67,6 +153,16 @@ class Range()
 			throw(Error("index out of range"));
 		end;
 		return this.from + off;
+	end;
+	def __iter__()
+		def cur = this.from, to = this.to;
+		return FnIterator(fn()
+			if cur < to then
+				cur = cur + 1;
+				return cur - 1;
+			end;
+			return done;
+		end);
 	end;
 private
 	def from, to;
@@ -124,6 +220,15 @@ def split(thk, h)
 	return res;
 end;
 
+def switchType(x, cs*)
+	for(cs, fn(c)
+		if x.is(c[0]) then
+			c[1]();
+			return done;
+		end;
+	end);
+end;
+
 // Call a function with an escape (one-shot) continuation.
 //
 // Calls f, and whatever it returns is returned by callWithCont(). f takes a
@@ -159,4 +264,44 @@ def callWithCont(f)
 	// error
 	throw(e);
 end;
+
+class Package()
+end;
+
+def packages = class()
+	def packagePaths = ["/usr/local/go/src/pkg/github.com/bobappleyard/ts"];
+	def create()
+		def root = loadExtension("system").env["TSROOT"];
+		if root then
+			this.packagePaths = [root + "/pkg"];
+		end;
+	end;
+	def __aget__(nm)
+		def p = this.pkgs[nm];
+		if p then
+			return p;
+		end;
+		def nmpath = nm.replace(".", "/") + ".pkg";
+		for(this.packagePaths, fn(path)
+			path = path + "/" + nmpath;
+			if catch(fn() = load(path)) then
+				return;
+			end;
+			p = this.pkgs[nm];
+			if p then
+				return done;
+			end;
+		end);
+		if !p then
+			throw("undefined package: " + nm);
+		end;
+		return p;
+	end;
+	def __aset__(nm, p)
+		this.pkgs[nm] = p;
+	end;
+private
+	def pkgs = {};
+end();
+
 
