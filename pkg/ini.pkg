@@ -1,0 +1,76 @@
+package ini
+
+	import data, system;
+
+	export read, write, readFile, writeFile;
+
+	def readFile(f) = system.File(f).read(fn(s) = read(s));
+	def writeFile(f, cfg) = system.File(f).write(fn(s) = write(s, x));
+
+	def read(s, cfg?)
+		def res = cfg || {};
+		def lines = data.readAll(s).toString().split("\n");
+		def section = "";
+		for(lines, fn(line)
+			line = line.trim();
+			// sections
+			if line.startsWith("[") && line.endsWith("]") then
+				section = parseSectionHeader(line);
+				return;
+			end;
+			if !res[section] then
+				res[section] = {};	
+			end;
+			// remove comments
+			line = line.split(";")[0].trim();
+			line = line.split("#")[0].trim();
+			if line == "" then
+				return;
+			end;
+			// name=value
+			parseConfLine(line, res[section]);
+		end);
+		return res;
+	end;
+	
+	def write(s, cfg)
+		if cfg[""] then
+			writeSection(s, cfg[""]);
+		end;
+		for(filter(cfg, fn(n) = n != ""), fn(sectionName)
+			writeLine(s, "");
+			writeLine(s, "[" + sectionName + "]");
+			writeSection(s, cfg[sectionName]);
+		end);
+	end;
+	
+	def parseSectionHeader(line)
+		def cs = line.split();
+		return cs.slice(1, cs.size-1).join().trim();
+	end;
+	
+	def parseConfLine(line, section)
+		if !line.contains("=") then
+			throw(Error("bad line: " + line));
+		end;
+		def parts = line.split("=");
+		def name = parts[0].trim();
+		def value = parts.slice(1).join("=").trim();
+		section[name] = value;
+	end;
+
+	def writeLine(s, line)
+		s.writeBuffer((line + "\n").toBuffer());
+	end;
+	
+	def writeSection(s, section)
+		for(section, fn(itemName)
+			if itemName.contains("=") then
+				throw(Error("bad name: " + itemName));
+			end;
+			writeLine(s, itemName + "=" + (section[itemName]));
+		end);
+	end;
+	
+end;
+
