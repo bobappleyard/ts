@@ -1,0 +1,14 @@
+package csv
+
+	export read, write, parse, emit;
+	
+	import data;
+	
+	def parse(str) = slurp(map(str.split("\n"), fn(line) = line.split(",")));
+	def emit(d) = slurp(map(d, fn(row) = row.join(","))).join("\n");
+	
+	def read(s) = parse(data.readAll(s).toString());
+	def write(s, d) = s.write(emit(d));
+
+end;
+
