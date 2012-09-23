@@ -41,7 +41,7 @@ func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
 		}),
 		ts.MSlot("open", func(o, f, p *ts.Object) *ts.Object {
 			path := File.Get(o, 0).ToString()
-			flags, perm := f.ToInt(), os.FileMode(p.ToInt())
+			flags, perm := int(f.ToInt()), os.FileMode(int(p.ToInt()))
 			fl, err := os.OpenFile(path, flags, perm)
 			if err != nil {
 				panic(err)

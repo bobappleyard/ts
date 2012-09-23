@@ -291,7 +291,7 @@ func (o *Object) Read(b []byte) (n int, err error) {
 	if res == False {
 		return 0, io.EOF
 	}
-	n = res.ToInt()
+	n = int(res.ToInt())
 	return
 }
 
@@ -311,7 +311,7 @@ func (o *Object) Write(b []byte) (n int, err error) {
 	if res == False {
 		return 0, io.EOF
 	}
-	n = res.ToInt()
+	n = int(res.ToInt())
 	return
 }
 

@@ -7,7 +7,7 @@ package text
 	       readUntil, readUntilWord;
 	
 
-	def codecs = packages["@text"];
+	def codecs = loadExtension("text");
 
 	def utf8 = data.Codec(codecs.read8, codecs.write8);
 	

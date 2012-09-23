@@ -2,6 +2,7 @@ package math
 
 import (
 	"math"
+	"math/rand"
 	"github.com/bobappleyard/ts"
 )
 
@@ -87,23 +88,30 @@ func pkg(it *ts.Interpreter) map[string] *ts.Object {
 			return ts.Wrap(math.Ilogb(flt(x)))
 		}),
 		"inf": ts.Wrap(func(o, sign *ts.Object) *ts.Object {
-			return ts.Wrap(math.Inf(sign.ToInt()))
+			return ts.Wrap(math.Inf(int(sign.ToInt())))
 		}),
 		"isInf": ts.Wrap(func(o, x, sign *ts.Object) *ts.Object {
-			return ts.Wrap(math.IsInf(flt(x), sign.ToInt()))
+			return ts.Wrap(math.IsInf(flt(x), int(sign.ToInt())))
 		}),
 		"isNaN": ts.Wrap(func(o, x *ts.Object) *ts.Object {
 			return ts.Wrap(math.IsNaN(flt(x)))
 		}),
 		"NaN": ts.Wrap(math.NaN()),
 		"pow10": ts.Wrap(func(o, e *ts.Object) *ts.Object {
-			return ts.Wrap(math.Pow10(e.ToInt()))
+			return ts.Wrap(math.Pow10(int(e.ToInt())))
 		}),
 		"jn": ts.Wrap(func(o, n, x *ts.Object) *ts.Object {
-			return ts.Wrap(math.Jn(n.ToInt(), flt(x)))
+			return ts.Wrap(math.Jn(int(n.ToInt()), flt(x)))
 		}),
 		"yn": ts.Wrap(func(o, n, x *ts.Object) *ts.Object {
-			return ts.Wrap(math.Yn(n.ToInt(), flt(x)))
+			return ts.Wrap(math.Yn(int(n.ToInt()), flt(x)))
+		}),
+		"seedRand": ts.Wrap(func(o, s *ts.Object) *ts.Object {
+			rand.Seed(s.ToInt())
+			return ts.Nil
+		}),
+		"rand": ts.Wrap(func(o *ts.Object) *ts.Object {
+			return ts.Wrap(rand.Float64())
 		}),
 	}
 

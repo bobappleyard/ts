@@ -6,6 +6,7 @@ import (
 	"strings"
 	"strconv"
 	"os"
+	"reflect"
 	"regexp"
 	"unicode/utf8"
 )
@@ -45,7 +46,7 @@ var emptyStr *Object
 
 func initCache() {
 	for i := 0; i < 1024; i++ {
-		intCache[i] = new(intObj).init(i)
+		intCache[i] = new(intObj).init(int64(i))
 	}
 	for i := 0; i < 128; i++ {
 		strCache[i] = new(strObj).init(string(i))
@@ -53,7 +54,7 @@ func initCache() {
 	emptyStr = new(strObj).init("")
 }
 
-func wrapInt(x int) *Object {
+func wrapInt(x int64) *Object {
 	if x >= 0 && x < 1024 {
 		return intCache[x]
 	}
@@ -92,23 +93,25 @@ func Wrap(x interface{}) *Object {
 		}
 		return False
 	case int8:
-		return wrapInt(int(v))
+		return wrapInt(int64(v))
 	case uint8:
-		return wrapInt(int(v))
+		return wrapInt(int64(v))
 	case int16:
-		return wrapInt(int(v))
+		return wrapInt(int64(v))
 	case uint16:
-		return wrapInt(int(v))
+		return wrapInt(int64(v))
 	case int32:
-		return wrapInt(int(v))
+		return wrapInt(int64(v))
 	case uint32:
-		return wrapInt(int(v))
+		return wrapInt(int64(v))
 	case int64:
-		return wrapInt(int(v))
+		return wrapInt(int64(v))
 	case uint64:
-		return wrapInt(int(v))
+		return wrapInt(int64(v))
 	case int:
-		return wrapInt(v)
+		return wrapInt(int64(v))
+	case uint:
+		return wrapInt(int64(v))
 	case float32:
 		return new(fltObj).init(float64(v))
 	case float64:
@@ -217,6 +220,15 @@ func Wrap(x interface{}) *Object {
 	case error:
 		return Wrap(v.Error())
 	}
+	v := reflect.ValueOf(x)
+	if v.Kind() == reflect.Array {
+		res := []*Object{}
+		l := v.Len()
+		for i := 0; i < l; i++ {
+			res = append(res, Wrap(v.Index(i).Interface()))
+		}
+		return Wrap(res)
+	}	
 	panic(fmt.Errorf("invalid type: %v", x))
 }
 
@@ -249,7 +261,7 @@ func AbstractMethod(n string) Slot {
 }
 
 // Retrieve int associated with the object. Panics if there is no such datum.
-func (o *Object) ToInt() int {
+func (o *Object) ToInt() int64 {
 	o.checkClass(o.c == IntClass)
 	return (*intObj)(unsafe.Pointer(o)).d
 }
@@ -401,7 +413,7 @@ func definePrimitives(i *Interpreter) {
 		code := 0
 		switch len(args) {
 		case 1:
-			code = args[0].ToInt()
+			code = int(args[0].ToInt())
 		case 0:
 		default:
 			 panic(ArgError(len(args)))
@@ -478,10 +490,10 @@ func (o *funcObj) init(x func(*process)) *Object {
 
 type intObj struct {
 	Object
-	d int
+	d int64
 }
 
-func (o *intObj) init(x int) *Object {
+func (o *intObj) init(x int64) *Object {
 	o.c = IntClass
 	o.d = x
 	return (*Object)(unsafe.Pointer(o))
@@ -947,7 +959,7 @@ func initSimpleClasses() {
 	FalseClass.flags = Final|Primitive
 }
 
-func numG(fi func(a, b int) *Object,
+func numG(fi func(a, b int64) *Object,
           ff func(a, b float64) *Object,
           fe func(a, b *Object) *Object) func(o, b *Object) *Object {
 	return func(o, bv *Object) *Object {
@@ -976,9 +988,9 @@ func numG(fi func(a, b int) *Object,
 	}
 }
 
-func numOp(fi func(a,b int) int,
+func numOp(fi func(a,b int64) int64,
            ff func(a,b float64) float64) func(o, b *Object) *Object {
-	return numG(func(a,b int) *Object {
+	return numG(func(a,b int64) *Object {
 		if fi == nil {
 			return Wrap(ff(float64(a), float64(b)))
 		}
@@ -988,9 +1000,9 @@ func numOp(fi func(a,b int) int,
 	}, nil)
 }
 
-func numPred(fi func(a,b int) bool,
+func numPred(fi func(a,b int64) bool,
              ff func(a,b float64) bool) func(o, b *Object) *Object {
-	return numG(func(a,b int) *Object {
+	return numG(func(a,b int64) *Object {
 		return Wrap(fi(a, b))
 	}, func(a,b float64) *Object {
 		return Wrap(ff(a, b))
@@ -1006,17 +1018,17 @@ func initNumberClasses() {
 		MSlot("copy", func(o *Object) *Object {
 			return o;
 		}),
-		MSlot("__add__", numOp(func(a, b int) int {
+		MSlot("__add__", numOp(func(a, b int64) int64 {
 			return a + b
 		}, func(a, b float64) float64 {
 			return a + b
 		})),
-		MSlot("__sub__", numOp(func(a, b int) int {
+		MSlot("__sub__", numOp(func(a, b int64) int64 {
 			return a - b
 		}, func(a, b float64) float64 {
 			return a - b
 		})),
-		MSlot("__mul__", numOp(func(a, b int) int {
+		MSlot("__mul__", numOp(func(a, b int64) int64 {
 			return a * b
 		}, func(a, b float64) float64 {
 			return a * b
@@ -1024,27 +1036,27 @@ func initNumberClasses() {
 		MSlot("__div__", numOp(nil, func(a, b float64) float64 {
 			return a / b
 		})),
-		MSlot("__eq__", numPred(func(a, b int) bool {
+		MSlot("__eq__", numPred(func(a, b int64) bool {
 			return a == b
 		}, func(a, b float64) bool {
 			return a == b
 		})),
-		MSlot("__lt__", numPred(func(a, b int) bool {
+		MSlot("__lt__", numPred(func(a, b int64) bool {
 			return a < b
 		}, func(a, b float64) bool {
 			return a < b
 		})),
-		MSlot("__lte__", numPred(func(a, b int) bool {
+		MSlot("__lte__", numPred(func(a, b int64) bool {
 			return a <= b
 		}, func(a, b float64) bool {
 			return a <= b
 		})),
-		MSlot("__gt__", numPred(func(a, b int) bool {
+		MSlot("__gt__", numPred(func(a, b int64) bool {
 			return a > b
 		}, func(a, b float64) bool {
 			return a > b
 		})),
-		MSlot("__gte__", numPred(func(a, b int) bool {
+		MSlot("__gte__", numPred(func(a, b int64) bool {
 			return a >= b
 		}, func(a, b float64) bool {
 			return a >= b
@@ -1113,6 +1125,7 @@ func initCollectionClasses() {
 		FSlot("msg", Nil),
 		FSlot("file", Nil),
 		FSlot("line", Nil),
+		FSlot("trace", Nil),
 		MSlot("toString", func(o *Object) *Object {
 			msg := ErrorClass.Get(o, 0)
 			file := ErrorClass.Get(o, 1)
@@ -1126,7 +1139,7 @@ func initCollectionClasses() {
 			ErrorClass.Set(o, 0, msg)
 			ErrorClass.Set(o, 1, Wrap(""))
 			ErrorClass.Set(o, 2, Wrap(0))
-			
+			ErrorClass.Set(o, 3, Wrap([]*Object{}))
 			return Nil
 		}),
 	})
@@ -1254,10 +1267,10 @@ func initCollectionClasses() {
 			to := len(t)
 			switch len(args) {
 			case 2:
-				to = args[1].ToInt()
+				to = int(args[1].ToInt())
 				fallthrough
 			case 1:
-				from = args[0].ToInt()
+				from = int(args[0].ToInt())
 			case 0:
 			default:
 				 panic(ArgError(len(args)))
@@ -1399,10 +1412,10 @@ func initCollectionClasses() {
 			to := len(t)
 			switch len(args) {
 			case 2:
-				to = args[1].ToInt()
+				to = int(args[1].ToInt())
 				fallthrough
 			case 1:
-				from = args[0].ToInt()
+				from = int(args[0].ToInt())
 			case 0:
 			default:
 				 panic(ArgError(len(args)))
@@ -1517,7 +1530,8 @@ func initCollectionClasses() {
 			return Wrap(res)
 		}),
 		MSlot("replace", func(o, from, to *Object) *Object {
-			s := strings.Replace(o.ToString(), from.ToString(), to.ToString(), -1)
+			froms := from.ToString()
+			s := strings.Replace(o.ToString(), froms, to.ToString(), -1)
 			return Wrap(s)
 		}),
 		PropSlot("size", func(o *Object) *Object {
@@ -1561,7 +1575,7 @@ func initCollectionClasses() {
 		}),
 		MSlot("__aget__", func(o, _idx *Object) *Object {
 			s := o.ToString()
-			idx := _idx.ToInt()
+			idx := int(_idx.ToInt())
 			var res rune
 			if idx < 0 {
 				panic(fmt.Errorf("runtime error: index out of range"))

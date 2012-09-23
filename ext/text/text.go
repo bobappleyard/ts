@@ -6,7 +6,7 @@ import (
 )
 
 func init() {
-	ts.RegisterExtension("@text", pkg)
+	ts.RegisterExtension("text", pkg)
 }
 
 func pkg(itpr *ts.Interpreter) map[string] *ts.Object {

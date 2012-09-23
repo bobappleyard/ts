@@ -1,7 +1,2 @@
-package web
-	export serve;
+packages["web"] = loadExtension("web");
 
-	def w = loadExtension("web");
-	def serve = w.serve;
-	
-end;

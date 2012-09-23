@@ -42,7 +42,7 @@ func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
 	
 	return map[string] *ts.Object {
 		"serve": ts.Wrap(func(o, p, f *ts.Object) *ts.Object {
-			port := ":" + strconv.Itoa(p.ToInt())
+			port := ":" + strconv.Itoa(int(p.ToInt()))
 			hnd := func(w http.ResponseWriter, r *http.Request) {
 				defer func() {
 					if e := recover(); e != nil {
