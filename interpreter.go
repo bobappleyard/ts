@@ -130,7 +130,7 @@ type process struct {
 // Create a new interpreter with the default environment.
 func New() *Interpreter {
 	i := new(Interpreter)
-	definePrimitives(i)
+	i.LoadPrimitives()
 	i.Load(root() + "/prelude")
 	return i
 }
@@ -1197,6 +1197,7 @@ func readString(r io.Reader, stop byte) string {
 }
 
 func writeString(w io.Writer, s string) {
+	fmt.Printf("writing string: %s\n", s)
 	_, err := io.WriteString(w, s)
 	if err != nil {
 		panic(err)
@@ -1373,7 +1374,7 @@ func (u *Unit) Save(w io.Writer) {
 		writeString(w, x.(string))
 	}
 	for _, x := range ints {
-		write(w, int32(x.(int)))
+		write(w, int32(x.(int64)))
 	}
 	for _, x := range floats {
 		write(w, x.(float64))

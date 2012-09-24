@@ -353,7 +353,7 @@ func root() string {
 }
 
 // registration function called by New()
-func definePrimitives(i *Interpreter) {
+func (i *Interpreter) LoadPrimitives() {
 	
 	AccessorClass.n = ""
 	cs := []*Class {
