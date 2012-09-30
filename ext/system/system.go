@@ -116,9 +116,6 @@ func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
 		"File": File.Object(),
 		"args": ts.Wrap(os.Args),
 		"env": ts.Wrap(env),
-		"eval": ts.Wrap(func(o, expr *ts.Object) *ts.Object {
-			return itpr.Eval(expr.ToString())
-		}),
 	}
 }
 

@@ -392,6 +392,10 @@ func (i *Interpreter) LoadPrimitives() {
 		return Nil
 	}))
 	
+	i.Define("eval", Wrap(func(o, expr *Object) *Object {
+		return i.Eval(expr.ToString())
+	}))
+
 	i.Define("read", Wrap(func(o *Object) *Object {
 		return Wrap(readString(os.Stdin, '\n'))
 	}))
