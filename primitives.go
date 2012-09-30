@@ -1515,21 +1515,24 @@ func initCollectionClasses() {
 			i := 0
 			inS := false
 			for _, c := range o.ToString() {
-				if c == '%' && inS {				
-					cur := args[i]
-					res += cur.String()
-					i++
-					continue
-				}
 				if c == '%' {
-					inS = true
-					continue
+					if inS {
+						res += "%"
+						inS = false
+					} else {
+						inS = true
+					}
+				} else {
+					if inS {
+						res += args[i].String()
+						i++
+						inS = false
+					}
+					res += string(c)
 				}
-				res += string(c)
 			}
 			if inS {
-				cur := args[i]
-				res += cur.String()
+				res += args[i].String()
 			}
 			return Wrap(res)
 		}),
