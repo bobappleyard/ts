@@ -2,13 +2,14 @@ package ts
 
 import (
 	"fmt"
-	"unsafe"
-	"strings"
-	"strconv"
 	"os"
 	"reflect"
 	"regexp"
+	"strings"
+	"strconv"
+	"sort"
 	"unicode/utf8"
+	"unsafe"
 )
 
 /*******************************************************************************
@@ -16,17 +17,6 @@ import (
 	Main entrypoints
 
 *******************************************************************************/
-
-// The root class. All other classes descend from this one.
-var ObjectClass *Class
-
-// Primitive data types. The normal operations on classes (extension, creation)
-// do not work on these classes.
-var ClassClass, AccessorClass, NilClass, BooleanClass, TrueClass, FalseClass,
-	CollectionClass, SequenceClass, IteratorClass, sequenceIteratorClass,
-    StringClass, NumberClass, IntClass, FltClass, FunctionClass, ArrayClass,
-    HashClass, ErrorClass, BufferClass,
-    frameClass, skeletonClass, boxClass, undefinedClass *Class
 
 // Built in values.
 var Nil, True, False, Done *Object
@@ -152,7 +142,7 @@ func Wrap(x interface{}) *Object {
 		}
 		res := make(map[interface{}] *Object)
 		for k, v := range v {
-			res[keyData([]*Object{k})] = v
+			res[keyData(k)] = v
 		}
 		return new(hashObj).init(res)
 	case map[interface{}] *Object:
@@ -352,6 +342,29 @@ func root() string {
 	return res
 }
 
+type sorter struct {
+	intf *[4]*Accessor // size, __aget__, __aset__, __lt__
+	inner *Object
+}
+
+func (s sorter) Len() int {
+	return int(s.inner.Get((*s.intf)[0]).ToInt())
+}
+
+func (s sorter) Less(i, j int) bool {
+	atI := s.inner.Call((*s.intf)[1], Wrap(i))
+	atJ := s.inner.Call((*s.intf)[1], Wrap(j))
+	return atI.Call((*s.intf)[3], atJ) != False
+}
+
+func (s sorter) Swap(i, j int) {
+	iv, jv := Wrap(i), Wrap(j)
+	atI := s.inner.Call((*s.intf)[1], iv)
+	atJ := s.inner.Call((*s.intf)[1], jv)
+	s.inner.Call((*s.intf)[2], iv, atJ)
+	s.inner.Call((*s.intf)[2], jv, atI)
+}
+
 // registration function called by New()
 func (i *Interpreter) LoadPrimitives() {
 	
@@ -447,6 +460,18 @@ func (i *Interpreter) LoadPrimitives() {
 	
 	i.Define("loadExtension", Wrap(func(o, n *Object) *Object {
 		return loadExtension(n.ToString(), i)
+	}))
+	
+	sortIntf := [4]*Accessor {
+		i.Accessor("size"),
+		i.Accessor("__aget__"),
+		i.Accessor("__aset__"),
+		i.Accessor("__lt__"),
+	}
+	
+	i.Define("sort", Wrap(func(o, a *Object) *Object {
+		sort.Sort(sorter{&sortIntf, a})
+		return Nil
 	}))
 }
 
@@ -648,7 +673,7 @@ const (
 	_Object_callFailed
 	_Object_toString
 	_Object_equals
-	_Object_type
+	_Object_key
 )
 
 func initBaseClasses() {
@@ -721,6 +746,9 @@ func initBaseClasses() {
 		}),
 		MSlot("equals", func(o, x *Object) *Object {
 			return ObjectClass.Call(o, _Object_eq, x)
+		}),
+		MSlot("__key__", func(o *Object) *Object {
+			return o
 		}),
 		MSlot("copy", func(o *Object) *Object {
 			f := make([]*Object, len(o.f))
@@ -855,7 +883,10 @@ func initBaseClasses() {
 			return Nil
 		}),
 		MSlot("__eq__", func(a, b *Object) *Object {
-			return Wrap(a.accessorData() == b.accessorData())
+			return Wrap(b.Is(AccessorClass) && a.accessorData() == b.accessorData())
+		}),
+		MSlot("toString", func(a *Object) *Object {
+			return Wrap("@" + a.accessorData().n)
 		}),
 	})
 
@@ -900,28 +931,21 @@ func classScanNames(c *Class, in map[string] bool, hook, deep bool) {
 	}
 }
 
-type keyList struct {
-	cur, next interface{}
-}
-
-func keyData(xs []*Object) interface{} {
-	res := objKeyData(xs[0])
-	for _, x := range xs[1:] {
-		res = keyList{objKeyData(x), res}
-	}
-	return res
-}
-
-func objKeyData(o *Object) interface{} {
+func keyData(o *Object) interface{} {
+	c := o.c
+	o = ObjectClass.Call(o, _Object_key)
+	var x interface{}
 	switch o.c {
 	case StringClass:
-		return o.ToString()
+		x = o.ToString()
 	case IntClass:
-		return o.ToInt()
+		x = o.ToInt()
 	case FltClass:
-		return o.ToFloat()
+		x = o.ToFloat()
+	default:
+		x = o
 	}
-	return o
+	return struct{c *Class; x interface{}}{c, x}
 }
 
 func trimString(args []*Object) string {
@@ -1188,6 +1212,12 @@ func initCollectionClasses() {
 	})
 	
 	ArrayClass = SequenceClass.extend("Array", Final, []Slot {
+		MSlot("copy", func(o *Object) *Object {
+			a := o.ToArray()
+			b := make([]*Object, len(a))
+			copy(b, a)
+			return Wrap(b)
+		}),
 		MSlot("join", func(o *Object, args []*Object) *Object {
 			if len(args) > 1 {
 				 panic(ArgError(len(args)))
@@ -1310,36 +1340,6 @@ func initCollectionClasses() {
 			_, _, both := setOp(o.ToArray(), x.ToArray(), _Object_eq)
 			return Wrap(both)
 		}),
-		MSlot("each", func(o, f *Object) *Object {
-			for _, x := range o.ToArray() {
-				f.Call(nil, x)
-			}
-			return Nil
-		}),
-		MSlot("map", func(o, f *Object) *Object {
-			a := o.ToArray()
-			res := make([]*Object, len(a))
-			for i, x := range a {
-				res[i] = f.Call(nil, x)
-			}
-			return Wrap(res)
-		}),
-		MSlot("reduce", func(o, acc, f *Object) *Object {
-			for _, x := range o.ToArray() {
-				acc = f.Call(nil, acc, x)
-			}
-			return acc
-		}),
-		MSlot("filter", func(o, f *Object) *Object {
-			a := o.ToArray()
-			res := make([]*Object, 0, len(a))
-			for _, x := range a {
-				if f.Call(nil, x) != False {
-					res = append(res, x)
-				}
-			}
-			return Wrap(res)
-		}),
 		MSlot("__aget__", func(o, i *Object) *Object {
 			return o.ToArray()[i.ToInt()]
 		}),
@@ -1384,22 +1384,24 @@ func initCollectionClasses() {
 			res += "}"
 			return Wrap(res)
 		}),
-		MSlot("__aget__", func(o *Object, args []*Object) *Object {
-			res := o.ToHash()[keyData(args)]
+		MSlot("__aget__", func(o, k *Object) *Object {
+			res := o.ToHash()[keyData(k)]
 			if res == nil {
-				res = False
+				panic(fmt.Errorf("missing value: %s", k))
 			}
 			return res
 		}),
-		MSlot("__aset__", func(o *Object, args []*Object) *Object {
-			v := args[len(args)-1]
-			args = args[:len(args)-1]
-			o.ToHash()[keyData(args)] = v
+		MSlot("__aset__", func(o, k, v *Object) *Object {
+			o.ToHash()[keyData(k)] = v
 			return Nil
 		}),
 		PropSlot("size", func(o *Object) *Object {
 			return Wrap(len(o.ToHash()))
 		}, Nil),
+		MSlot("contains", func(o, k *Object) *Object {
+			_, ok := o.ToHash()[keyData(k)]
+			return Wrap(ok)
+		}),
 	})
 	
 	BufferClass = SequenceClass.extend("Buffer", Final, []Slot {
@@ -1579,6 +1581,18 @@ func initCollectionClasses() {
 				return False
 			}
 			return Wrap(o.ToString() == s.ToString())
+		}),
+		MSlot("__lt__", func(o, s *Object) *Object {
+			return Wrap(o.ToString() < s.ToString())
+		}),
+		MSlot("__lte__", func(o, s *Object) *Object {
+			return Wrap(o.ToString() <= s.ToString())
+		}),
+		MSlot("__gt__", func(o, s *Object) *Object {
+			return Wrap(o.ToString() > s.ToString())
+		}),
+		MSlot("__gte__", func(o, s *Object) *Object {
+			return Wrap(o.ToString() >= s.ToString())
 		}),
 		MSlot("__aget__", func(o, _idx *Object) *Object {
 			s := o.ToString()
