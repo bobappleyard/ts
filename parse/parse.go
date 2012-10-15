@@ -94,6 +94,21 @@ func (p *Parser) Parse(l *Lexer, prec int) *Node {
 
 // Parse an expression at a given precedence level, given an initial token.
 func (p *Parser) ParseWith(l *Lexer, prec int, t Token) *Node {
+	pp := p.prefix(t)
+	left := pp.Prefix(p, l, t)
+	for {
+		t = l.Lookahead()
+		ip := p.infix(t)
+		if ip == nil || ip.Precedence(t) <= prec {
+			break
+		}
+		l.Next()
+		left = ip.Infix(p, l, left, t)
+	}
+	return left
+}
+
+func (p *Parser) prefix(t Token) Prefix {
 	pp := p.pp[key{t.Kind, t.Text}]
 	if pp == nil {
 		pp = p.pp[key{t.Kind, ""}]
@@ -104,20 +119,15 @@ func (p *Parser) ParseWith(l *Lexer, prec int, t Token) *Node {
 		}
 		pp = p.el
 	}
-	left := pp.Prefix(p, l, t)
-	for {
-		t = l.Lookahead()
-		ip := p.ip[key{t.Kind, t.Text}]
-		if ip == nil {
-			ip = p.ip[key{t.Kind, ""}]
-		}
-		if ip == nil || ip.Precedence(t) <= prec {
-			break
-		}
-		l.Next()
-		left = ip.Infix(p, l, left, t)
+	return pp
+}
+
+func (p *Parser) infix(t Token) Infix {
+	ip := p.ip[key{t.Kind, t.Text}]
+	if ip == nil {
+		ip = p.ip[key{t.Kind, ""}]
 	}
-	return left
+	return ip
 }
 
 // Register a prefix handler.
@@ -146,6 +156,8 @@ func (p *Parser) RegBoth(k int, s string, bp Both) {
 func (p *Parser) RegElse(ep Prefix) {
 	p.el = ep
 }
+
+
 
 func TokenError(format string, t Token, args... interface{}) error {
 	args = append([]interface{}{t.File, t.Line}, args...)
