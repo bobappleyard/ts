@@ -1197,7 +1197,6 @@ func readString(r io.Reader, stop byte) string {
 }
 
 func writeString(w io.Writer, s string) {
-	fmt.Printf("writing string: %s\n", s)
 	_, err := io.WriteString(w, s)
 	if err != nil {
 		panic(err)
