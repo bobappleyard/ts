@@ -515,10 +515,14 @@ func (u *Unit) compileFn(n *Node, e compilerCtx) {
 	boxed := boxedVars(body, bound, e)
 	f := compilerCtx{bound, free, boxed, e.class, new([]uint16), 0}
 	// emit function prologue
-	if args.Data == true {
-		f.write(PROLOG_REST, len(bound)-args.Kind-1, len(bound)-1)
-	} else if args.Kind != 0 {
-		f.write(PROLOG_OPT, len(bound)-args.Kind, len(bound))
+	var desc fdesc
+	if args.Data != nil {
+		desc = args.Data.(fdesc)
+	}
+	if desc.rest {
+		f.write(PROLOG_REST, len(bound)-desc.opt-1, len(bound)-1)
+	} else if desc.opt != 0 {
+		f.write(PROLOG_OPT, len(bound)-desc.opt, len(bound))
 	} else {
 		f.write(PROLOG, len(bound))
 	}

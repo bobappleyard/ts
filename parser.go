@@ -330,6 +330,14 @@ func parseFnum(p *Parser, l *Lexer, t Token) *Node {
 	return &Node{Kind: valNode, Token: t, Data: Wrap(f)}
 }
 
+func parseAccExpr(p *Parser, l *Lexer, t Token) *Node {
+	t = l.Next()
+	if t.Kind != id {
+		panic(Expected("identifier", t))
+	}
+	return kNode(callNode).Add(tNode(varNode, "Accessor"), vNode(t.Text))
+}
+
 func parseBuiltin(p *Parser, l *Lexer, t Token) *Node {
 	var v interface{}
 	switch t.Text {
@@ -447,9 +455,15 @@ func (q funcParser) Infix(p *Parser, l *Lexer, left *Node, t Token) *Node {
 	return n
 }
 
+type fdesc struct {
+	opt int
+	rest bool
+}
+
 func parseFn(l *Lexer) *Node {
 	args := new(Node)
 	fn := kNode(fnNode).Add(args)
+	var desc fdesc
 	inOpt := false
 	parseList(l, args, ")", func() *Node {
 		if args.Data == true {
@@ -459,10 +473,10 @@ func parseFn(l *Lexer) *Node {
 		switch l.Lookahead().Text {
 		case "*":
 			l.Next()
-			args.Data = true
+			desc.rest = true
 		case "?":
 			l.Next()
-			args.Kind++
+			desc.opt++
 			inOpt = true
 		default:
 			if inOpt {
@@ -471,6 +485,7 @@ func parseFn(l *Lexer) *Node {
 		}
 		return n
 	})
+	args.Data = desc
 	Expect(")", l.Next())
 	t := l.Lookahead()
 	if t.Text == "=" {
@@ -797,6 +812,8 @@ func initParsers() (expr, stmt *Parser) {
 	expr.RegInfix(literal, "(", funcs)
 
 	expr.RegPrefix(literal, "(", ParserFunc(parseGroup))
+	
+	expr.RegPrefix(op, "@", ParserFunc(parseAccExpr))
 	
 	expr.RegPrefix(op, "!", prefixOp{60, "__inv__"})
 	expr.RegPrefix(op, "-", prefixOp{60, "__neg__"})
