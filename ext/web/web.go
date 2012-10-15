@@ -1,7 +1,6 @@
 package web
 
 import (
-	"io"
 	"fmt"
 	"strconv"
 	"net/http"
@@ -14,32 +13,81 @@ func init() {
 	ts.RegisterExtension("web", pkg)
 }
 
-func inputVars(r *http.Request) *ts.Object {
-	r.ParseForm()
-	vars := make(map[interface{}] *ts.Object)
-	for k, v := range r.Form {
-		vars[k] = ts.Wrap(v)
-	}
-	return ts.Wrap(vars)
-}
-
 func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
-	FileClass := itpr.Import("system").Get(itpr.Accessor("File")).ToClass()
+	var Request, Response *ts.Class
 
-	handle := func(w http.ResponseWriter, r *http.Request, resp *ts.Object) {
-		switch resp.Class() {
-		case ts.StringClass:
-			_, err := io.WriteString(w, resp.ToString())
-			if err != nil {
+	Request = ts.ObjectClass.Extend(itpr, "Request", ts.UserData, []ts.Slot {
+		ts.PSlot("headMap", ts.Nil),
+		ts.PSlot("formMap", ts.Nil),
+		ts.PropSlot("method", func(o *ts.Object) *ts.Object {
+			return ts.Wrap(o.UserData().(*http.Request).Method)
+		}, ts.Nil),
+		ts.PropSlot("proto", func(o *ts.Object) *ts.Object {
+			return ts.Wrap(o.UserData().(*http.Request).Proto)
+		}, ts.Nil),
+		ts.PropSlot("path", func(o *ts.Object) *ts.Object {
+			return ts.Wrap(o.UserData().(*http.Request).URL.Path)
+		}, ts.Nil),
+		ts.PropSlot("header", func(o *ts.Object) *ts.Object {
+			return Request.Get(o, 0)
+		}, ts.Nil),
+		ts.PropSlot("form", func(o *ts.Object) *ts.Object {
+			rv := o.UserData().(*http.Request)
+			if err := rv.ParseMultipartForm(32 << 20); err != nil {
 				panic(err)
 			}
-		case FileClass:
-			http.ServeFile(w, r, FileClass.Get(resp, 0).ToString())
-		default:
-			panic(fmt.Errorf("wrong type: %s", resp))
+			fm := make(map[*ts.Object]*ts.Object)
+			for k, v := range rv.Form {
+				fm[ts.Wrap(k)] = ts.Wrap(v)
+			}
+			fmw := ts.Wrap(fm)
+			Request.Set(o, 1, fmw)
+			return fmw
+		}, ts.Nil),
+	})
+
+	wrapReq := func(r *http.Request) *ts.Object {
+		o := Request.New()
+		o.SetUserData(r)
+		hm := make(map[*ts.Object]*ts.Object)
+		for k, v := range r.Header {
+			hm[ts.Wrap(k)] = ts.Wrap(v)
 		}
+		Request.Set(o, 0, ts.Wrap(hm))
+		if err := r.ParseForm(); err != nil {
+			panic(err)
+		}
+		return o
 	}
 	
+	Response = ts.ObjectClass.Extend(itpr, "Response", ts.UserData, []ts.Slot {
+		ts.MSlot("writeBuffer", func(o, b *ts.Object) *ts.Object {
+			bv := b.ToBuffer()
+			rw := o.UserData().(http.ResponseWriter)
+			if _, err := rw.Write(bv); err != nil {
+				panic(err)
+			}
+			return ts.Nil
+		}),
+		ts.MSlot("writeHeader", func(o, c, h *ts.Object) *ts.Object {
+			cv := int(c.ToInt())
+			hv := h.ToHash()
+			rw := o.UserData().(http.ResponseWriter)
+			rwh := rw.Header()
+			for k, v := range hv {
+				rwh[k.(string)] = []string{v.ToString()}
+			}
+			rw.WriteHeader(cv)
+			return ts.Nil
+		}),
+	})
+	
+	wrapResp := func(w http.ResponseWriter) *ts.Object {
+		o := Response.New()
+		o.SetUserData(w)
+		return o
+	}
+
 	return map[string] *ts.Object {
 		"serve": ts.Wrap(func(o, p, f *ts.Object) *ts.Object {
 			port := ":" + strconv.Itoa(int(p.ToInt()))
@@ -49,8 +97,7 @@ func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
 						fmt.Println("web.serve:", e)
 					}
 				}()
-				resp := f.Call(nil, ts.Wrap(r.URL.Path), inputVars(r))
-				handle(w, r, resp)
+				f.Call(nil, wrapResp(w), wrapReq(r))
 			}
 			http.ListenAndServe(port, http.HandlerFunc(hnd))
 			return ts.Nil
