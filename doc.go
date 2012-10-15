@@ -84,11 +84,6 @@ Arrays are series of objects enclosed in brackets and separated with ",".
 
 	[1, 2, 3]
 
-The familiar subscript access is available.
-
-	array[0]      // get the zeroth member
-	array[1] = 2  // set the first member to 2
-
 Arrays may be concatenated as strings are.
 
 	[1, 2] + [3, 4] // [1, 2, 3, 4]
@@ -98,8 +93,14 @@ In each pair, the key is separated from the value by ":".
 
 	{"key1": "value1", "key2": "value2"}
 
-Any object may be a key or a value. Only strings and numbers are likely to be
-useful keys most of the time, though.
+Strings, hashes and arrays are all instances of collections. Accessing the
+members of a collection follows the familiar subscript notation.
+
+	coll[0]       // read a member from the collection
+	coll["ok"]    // write a member to the collection
+
+Different kinds of collections impose different restrictions on what can appear
+in the subscript.
 
 Conditional Evaluation
 
