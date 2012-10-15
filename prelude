@@ -1,3 +1,11 @@
+def writeString(dst, s)
+	dst.writeBuffer(s.toBuffer());
+end;
+
+def invert(f) = fn(args*)
+	return !f.apply(args);
+end;
+
 // The part of the standard library implemented in TranScript.
 
 // Iteration
@@ -37,7 +45,7 @@ end;
 
 // Create an iterator composed of the return values of applying a function to
 // each item in a source iterable.
-def map(it, f)
+def imap(it, f)
 	it = it.__iter__();
 	return FnIterator(fn()
 		def x = it.next();
@@ -48,7 +56,7 @@ def map(it, f)
 	end);
 end;
 
-def reduce(it, acc, f)
+def ireduce(it, acc, f)
 	for(it, fn(x)
 		acc = f(x, acc);
 	end);
@@ -57,7 +65,7 @@ end;
 
 // Create an iterator composed of all the items in an iterable that pass a
 // criterion function.
-def filter(it, f)
+def ifilter(it, f)
 	it = it.__iter__();
 	def check()
 		def x = it.next();
@@ -74,20 +82,17 @@ def filter(it, f)
 	end);
 end;
 
-// Find the first item in an iterable that passes a criterion function, or false
-// if no items match.
-def find(it, f)
-	def res = filter(it, f).next();
-	if res == done then
-		return false;
-	end;
-	return res;
+def any(it, f)
+	def fit = ifilter(it, f);
+	return fit.next() != done;
 end;
+
+def none = invert(any);
 
 // Create an iterator composed of a series of iterables. When one iterator
 // signals it is at an end by returning done, the next iterable is used. When no
 // more iterables remain, append returns done.
-def append(it, rest*)
+def iappend(it, rest*)
 	it = it.__iter__();
 	def next()
 		def x = it.next();
@@ -106,6 +111,27 @@ def append(it, rest*)
 	end);
 end;
 
+def izip(its*)
+	its = map(its, @__iter__.call);
+	return FnIterator(fn()
+		def isDone = false;
+		def cur = map(its, fn(x)
+			def item = x.next();
+			if item == done then
+				isDone = true;
+			end;
+			return item;
+		end);
+		if isDone then
+			return done;
+		end;
+		if any(cur, fn(x) = x == done) then
+			return done;
+		end;
+		return cur;
+	end);
+end;
+
 // Turn an iterator into an array.
 def slurp(it)
 	def res = [];
@@ -113,41 +139,29 @@ def slurp(it)
 	return res;
 end;
 
-// Rearrange arrays so that rows become columns.
-def zip(as*)
-	def alen = as.size, rlen = 1/0;
-	as.each(fn(x)
-		def s = x.size;
-		if s < rlen then
-			rlen = s;
-		end;
-	end);
-	if rlen == 1/0 then
-		throw(Error("infinite range"));
+def map(it, f) = slurp(imap(it, f));
+def reduce(it, f) = slurp(ireduce(it, f));
+def filter(it, f) = slurp(ifilter(it, f));
+def append(its*) = slurp(iappend.apply(its));
+def zip(its*) = slurp(izip.apply(its));
+
+// Find the first item in an iterable that passes a criterion function, or false
+// if no items match.
+def find(it, f)
+	def res = filter(it, f).next();
+	if res == done then
+		return false;
 	end;
-	def res = Array(rlen);
-	for(Range(rlen), fn(i)
-		def a = Array(alen);
-		for(Range(alen), fn(j)
-			a[j] = as[j][i];
-		end);
-		res[i] = a;
-	end);
 	return res;
 end;
 
 // Represent a range of numbers as if it were an array.
-class Range()
+class range()
 	def create(from, to?)
 		this.from = (to && from) || 0;
 		this.to = to || from;
 	end;
-	def size get()
-		if this.to then
-			return this.to - this.from;
-		end;
-		return 1/0;
-	end;
+	def size get() = this.to - this.from;
 	def __aget__(off)
 		if off > this.size then
 			throw(Error("index out of range"));
@@ -171,28 +185,6 @@ end;
 // Printf-like function.
 def printf(pat, xs*)
 	print(pat.subst.apply(xs));
-end;
-
-// Collects functions to multiplex calls over.
-class Event()
-	def create()
-		this.handlers = [];
-	end;
-	// Add a handler: this is a function that will get called whenever the 
-	// event is called.
-	def add(h)
-		this.handlers.add(h);
-	end;
-	// Remove a handler.
-	def remove(h)
-		this.handlers.remove(h);
-	end;
-	// Allows the event object to have a function call interface.
-	def __call__(args*)
-		this.handlers.each(fn(h) = h.apply(args));
-	end;
-private
-	def handlers;
 end;
 
 // Schedule some code to run whether an error happened or not.
@@ -269,26 +261,29 @@ class Package()
 end;
 
 def packages = class()
-	def packagePaths = ["/usr/local/go/src/pkg/github.com/bobappleyard/ts"];
+	def packagePaths = ["/usr/local/go/src/pkg/github.com/bobappleyard/ts/pkg"];
 	def create()
-		def root = loadExtension("system").env["TSROOT"];
-		if root then
-			this.packagePaths = [root + "/pkg"];
+		def system = loadExtension("system");
+		if system.env.contains("TSROOT") then
+			def root = system.env["TSROOT"];
+			this.packagePaths = [root.trimRight("/") + "/pkg"];
 		end;
 	end;
 	def __aget__(nm)
-		def p = this.pkgs[nm];
-		if p then
-			return p;
+		if this.pkgs.contains(nm) then
+			return this.pkgs[nm];
 		end;
+		def p = false;
 		def nmpath = nm.replace(".", "/") + ".pkg";
 		for(this.packagePaths, fn(path)
 			path = path + "/" + nmpath;
-			if catch(fn() = load(path)) then
+			def e = catch(fn() = load(path));
+			if e then
+				print(e);
 				return;
 			end;
-			p = this.pkgs[nm];
-			if p then
+			if this.pkgs.contains(nm) then
+				p = this.pkgs[nm];
 				return done;
 			end;
 		end);
@@ -303,5 +298,62 @@ def packages = class()
 private
 	def pkgs = {};
 end();
+
+def record = fn()
+	def cache = {};
+	
+	def template = "fn()"                    +
+	               "	class Record()"      +
+	               "		def %;"          +
+	               "		def create(%)"   +
+	               "			%;"          +
+	               "		end;"            +
+	               "	end;"                +
+	               "	return Record;"      +
+	               "end();";
+	
+	return fn(slots*)
+		slots = map(slots, @name.get);
+		sort(slots);
+		
+		def sl = slots.join(", ");
+		
+		if cache[sl] then
+			return cache[sl];
+		end;
+		
+		def init = map(slots, fn(x)
+			return "this.% = %".subst(x, x);
+		end).join(";");
+		
+		def expr = template.subst(sl, sl, init);
+		def res = eval(expr);
+		cache[sl] = res;
+		
+		return res;
+	end;
+	
+end();
+
+class Key(Sequence)
+	def create(items*)
+		this.items = items;
+	end;
+	
+	def __key__() = this.items.join(1.toChar());
+
+	def size get() = this.items.size;
+	def __aget__(ix) = this.items[ix];
+	def __aset__(ix, v) this.items[ix] = v; end;
+	
+	def toString() = "#<Key " + map(this.items, fn(item)
+		if item.is(String) then
+			return item.quote();
+		end;
+		return item;
+	end).join(", ") + ">";
+private
+	def items;
+end;
 
 
