@@ -232,7 +232,7 @@ end;
 // This is somewhat like call/cc in Scheme. However, unlike Scheme's
 // continuations, these continuations are not valid after callWithCont()
 // returns.
-def callWithCont(f)
+def callWithEscape(f, unwind?)
 	def key = Object(),
 	    followed = false,
 	    res;
@@ -246,6 +246,7 @@ def callWithCont(f)
 	end);
 	followed = true;
 	// normal return
+	unwind && unwind();
 	if !e then
 		return res;
 	end;
@@ -318,7 +319,7 @@ def record = fn()
 		
 		def sl = slots.join(", ");
 		
-		if cache[sl] then
+		if cache.contains(sl) then
 			return cache[sl];
 		end;
 		
