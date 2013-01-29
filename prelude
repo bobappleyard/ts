@@ -148,7 +148,7 @@ def zip(its*) = slurp(izip.apply(its));
 // Find the first item in an iterable that passes a criterion function, or false
 // if no items match.
 def find(it, f)
-	def res = filter(it, f).next();
+	def res = ifilter(it, f).next();
 	if res == done then
 		return false;
 	end;
@@ -315,7 +315,6 @@ def record = fn()
 	
 	return fn(slots*)
 		slots = map(slots, @name.get);
-		sort(slots);
 		
 		def sl = slots.join(", ");
 		
