@@ -789,11 +789,6 @@ func initBaseClasses() {
 		MSlot("__call__", func(o *Object, args []*Object) *Object {
 			return o.ToClass().New(args...)
 		}),
-		MSlot("is", func(o, x *Object) *Object {
-			c := o.ToClass()
-			d := o.ToClass()
-			return Wrap(c.Is(d))
-		}),
 		MSlot("copy", func(o *Object) *Object {
 			return o;
 		}),
