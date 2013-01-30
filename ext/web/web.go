@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"net/http"
-	"net/url"
+	//"net/url"
 	"github.com/bobappleyard/ts"
 	_ "github.com/bobappleyard/ts/ext/system"
 )
@@ -70,14 +70,14 @@ func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
 			return ts.Nil
 		}),
 		ts.MSlot("writeHeader", func(o, c, h *ts.Object) *ts.Object {
-			cv := int(c.ToInt())
+			/*cv := int(c.ToInt())
 			hv := h.ToHash()
 			rw := o.UserData().(http.ResponseWriter)
 			rwh := rw.Header()
 			for k, v := range hv {
 				rwh[k.(string)] = []string{v.ToString()}
 			}
-			rw.WriteHeader(cv)
+			rw.WriteHeader(cv)*/
 			return ts.Nil
 		}),
 	})
@@ -113,7 +113,7 @@ func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
 			return ts.Wrap(resp.Body)
 		}),
 		"post": ts.Wrap(func(o, u, form *ts.Object) *ts.Object {
-			vals := url.Values{}
+			/*vals := url.Values{}
 			for k, v := range form.ToHash() {
 				vals.Add(k.(string), v.ToString())
 			}
@@ -124,7 +124,8 @@ func pkg(itpr *ts.Interpreter) map[string] *ts.Object {
 			if resp.StatusCode != 200 {
 				panic(fmt.Errorf("web.get: status %d", resp.StatusCode))
 			}
-			return ts.Wrap(resp.Body)
+			return ts.Wrap(resp.Body)*/
+			return ts.Nil
 		}),
 	}
 }

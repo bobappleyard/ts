@@ -17,10 +17,21 @@ end;
 // that moves the iterator onwards, returning the next item, or done if there
 // are no more items.
 
+// Coerce a value to an iterator.
+def iter(x)
+	if @__iter__.on(x) then
+		return x.__iter__();
+	end;
+	if x.is(Number) then
+		return iter(range(x));
+	end;
+	return FnIterator(x);
+end;
+
 // Call a function for every item in an iterable. That function may return done,
 // so halting iteration.
 def for(it, f)
-	it = it.__iter__();
+	it = iter(it);
 	def step()
 		def x = it.next();
 		if x != done then
@@ -46,8 +57,8 @@ end;
 // Create an iterator composed of the return values of applying a function to
 // each item in a source iterable.
 def imap(it, f)
-	it = it.__iter__();
-	return FnIterator(fn()
+	it = iter(it);
+	return iter(fn()
 		def x = it.next();
 		if x != done then
 			return f(x);
@@ -66,7 +77,7 @@ end;
 // Create an iterator composed of all the items in an iterable that pass a
 // criterion function.
 def ifilter(it, f)
-	it = it.__iter__();
+	it = iter(it);
 	def check()
 		def x = it.next();
 		if x == done then
@@ -77,23 +88,27 @@ def ifilter(it, f)
 		end;
 		return check();
 	end;
-	return FnIterator(fn()
-		return check();
-	end);
+	return iter(check);
 end;
 
-def any(it, f)
+def none(it, f?)
+	f = f || fn(x) = x;
 	def fit = ifilter(it, f);
-	return fit.next() != done;
+	return fit.next() == done;
 end;
 
-def none = invert(any);
+def any = invert(none);
+
+def all(it, f?)
+	f = f || fn(x) = x;
+	return none(it, invert(f));
+end;
 
 // Create an iterator composed of a series of iterables. When one iterator
 // signals it is at an end by returning done, the next iterable is used. When no
 // more iterables remain, append returns done.
 def iappend(it, rest*)
-	it = it.__iter__();
+	it = iter(it);
 	def next()
 		def x = it.next();
 		if x == done then
@@ -106,14 +121,12 @@ def iappend(it, rest*)
 		end;
 		return x;
 	end;
-	return FnIterator(fn()
-		return next();
-	end);
+	return iter(next);
 end;
 
 def izip(its*)
-	its = map(its, @__iter__.call);
-	return FnIterator(fn()
+	its = map(its, iter);
+	return iter(fn()
 		def isDone = false;
 		def cur = map(its, fn(x)
 			def item = x.next();
@@ -170,7 +183,7 @@ class range()
 	end;
 	def __iter__()
 		def cur = this.from, to = this.to;
-		return FnIterator(fn()
+		return iter(fn()
 			if cur < to then
 				cur = cur + 1;
 				return cur - 1;
@@ -355,5 +368,3 @@ class Key(Sequence)
 private
 	def items;
 end;
-
-

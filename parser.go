@@ -250,6 +250,10 @@ type prefixOp struct {
 	m string
 }
 
+func (q prefixOp) Precedence(t Token) int {
+	return q.p
+}
+
 func (q prefixOp) Prefix(p *Parser, l *Lexer, t Token) *Node {
 	n := &Node{Kind: callNode, Token: t}
 	return n.Add(tNode(lookNode, q.m).Add(p.Parse(l, q.p)))
@@ -432,16 +436,18 @@ func parseProp(l *Lexer) *Node {
 }
 
 // functions
-type funcParser struct { p int }
+type funcParser struct {
+	p int
+}
+
+func (q funcParser) Precedence(t Token) int {
+	return q.p
+}
 
 func (q funcParser) Prefix(p *Parser, l *Lexer, t Token) *Node {
 	// defining
 	Expect("(", l.Next())
 	return parseFn(l)
-}
-
-func (q funcParser) Precedence(t Token) int {
-	return q.p
 }
 
 func (q funcParser) Infix(p *Parser, l *Lexer, left *Node, t Token) *Node {
@@ -497,8 +503,30 @@ func parseFn(l *Lexer) *Node {
 	return fn
 }
 
+/// pairs
+type pairParser struct { 
+	p int
+}
+
+func (q pairParser) Precedence(t Token) int {
+	return q.p
+}
+
+func (q pairParser) Infix(p *Parser, l *Lexer, left *Node, t Token) *Node {
+	right := p.Parse(l, q.p - 1)
+	n := kNode(callNode).Add(tNode(varNode, "Pair"), left, right)
+	n.Token = t
+	return n
+}
+
 // arrays
-type arrParser struct { p int }
+type arrParser struct {
+	p int
+}
+
+func (q arrParser) Precedence(t Token) int {
+	return q.p
+}
 
 func (q arrParser) Prefix(p *Parser, l *Lexer, t Token) *Node {
 	avar := tNode(varNode, "@tmp")
@@ -517,10 +545,6 @@ func (q arrParser) Prefix(p *Parser, l *Lexer, t Token) *Node {
 	return n.Add(kNode(fnNode).Add(new(Node),def,add,kNode(retNode).Add(avar)))
 }
 
-func (q arrParser) Precedence(t Token) int {
-	return q.p
-}
-
 func (q arrParser) Infix(p *Parser, l *Lexer, left *Node, t Token) *Node {
 	n := kNode(alookNode).Add(left)
 	n.Token = t
@@ -533,36 +557,19 @@ func (q arrParser) Infix(p *Parser, l *Lexer, left *Node, t Token) *Node {
 
 // hashes
 func parseHash(p *Parser, l *Lexer, t Token) *Node {
-	n := &Node{Token:t}
+	n := kNode(callNode).Add(tNode(varNode, "Hash"))
+	n.Token = t
 	parseList(l, n, "}", func() *Node {
-		k := expr.Parse(l, 0)
-		Expect(":", l.Next())
-		v := expr.Parse(l, 0)
-		return new(Node).Add(k, v)
+		return expr.Parse(l, 0)
 	})
 	Expect("}", l.Next())
-	return transHash(n)
-}
-
-func transHash(n *Node) *Node {
-	avar := tNode(varNode, "@tmp")
-	fn := kNode(fnNode).Add(new(Node))
-	fn.Add(kNode(defNode).Add(kNode(varNode).Add(
-		avar,
-		kNode(callNode).Add(tNode(varNode, "Hash")),
-	)))
-	for _, x := range n.Child {
-		fn.Add(kNode(mutNode).Add(
-			kNode(alookNode).Add(avar, x.Child[0]),
-			x.Child[1],
-		))
-	}
-	fn.Add(kNode(retNode).Add(avar))
-	return (&Node{Kind: callNode, Token: n.Token}).Add(fn)
+	return n
 }
 
 // objects
-type objParser struct { p int }
+type objParser struct {
+	p int
+}
 
 func (q objParser) Precedence(t Token) int {
 	return q.p
@@ -637,7 +644,7 @@ func parseStmt(p *Parser, l *Lexer, t Token) *Node {
 	}
 	return n
 }
-		
+
 func parseIf(p *Parser, l *Lexer, t Token) *Node {
 	n := &Node{Kind: ifNode, Token: t}
 	cn := expr.Parse(l, 0)
@@ -832,8 +839,10 @@ func initParsers() (expr, stmt *Parser) {
 	expr.RegInfix(op, "==", leftOp{30, "__eq__"})
 	expr.RegInfix(op, "!=", leftOp{30, "__neq__"})
 	
-	expr.RegInfix(op, "||", logOp{20})
-	expr.RegInfix(op, "&&", logOp{20})
+	expr.RegInfix(literal, ":", pairParser{20})
+	
+	expr.RegInfix(op, "||", logOp{10})
+	expr.RegInfix(op, "&&", logOp{10})
 	
 	
 	stmt.RegPrefix(id, "def", ParserFunc(parseDef))

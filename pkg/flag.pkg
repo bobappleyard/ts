@@ -36,7 +36,7 @@ package flag
 					printUsage(spec);
 					exit();
 				end;
-				if !a.defined(spec) then
+				if !a.on(spec) then
 					print("unknown option: -" + a.name());
 					fail(spec);				
 				end;

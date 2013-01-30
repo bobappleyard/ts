@@ -8,7 +8,7 @@ var ObjectClass *Class
 var ClassClass, AccessorClass, NilClass, BooleanClass, TrueClass, FalseClass,
 	CollectionClass, SequenceClass, IteratorClass, sequenceIteratorClass,
     StringClass, NumberClass, IntClass, FltClass, FunctionClass, ArrayClass,
-    ErrorClass, BufferClass,
+    ErrorClass, BufferClass, PairClass,
     frameClass, skeletonClass, boxClass, undefinedClass *Class
 
 /*

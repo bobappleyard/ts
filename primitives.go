@@ -140,16 +140,11 @@ func Wrap(x interface{}) *Object {
 		if v == nil {
 			return Nil
 		}
-		res := make(map[interface{}] *Object)
+		res := make(map[hashKey] *Object)
 		for k, v := range v {
 			res[keyData(k)] = v
 		}
 		return new(hashObj).init(res)
-	case map[interface{}] *Object:
-		if v == nil {
-			return Nil
-		}
-		return new(hashObj).init(v)
 	case func(*Object, []*Object) *Object:
 		if v == nil {
 			return Nil
@@ -209,6 +204,10 @@ func Wrap(x interface{}) *Object {
 		})
 	case error:
 		return Wrap(v.Error())
+	case hashKey:
+		return Wrap(v.v)
+	case pairKey:
+		return PairClass.New(Wrap(v.this), Wrap(v.next))
 	}
 	v := reflect.ValueOf(x)
 	if v.Kind() == reflect.Array {
@@ -282,7 +281,7 @@ func (o *Object) ToClass() *Class {
 	return (*clsObj)(unsafe.Pointer(o)).d
 }
 
-func (o *Object) ToHash() map[interface{}] *Object {
+func (o *Object) ToHash() map[hashKey] *Object {
 	o.checkClass(o.c == HashClass)
 	return (*hashObj)(unsafe.Pointer(o)).d
 }
@@ -374,7 +373,7 @@ func (i *Interpreter) LoadPrimitives() {
 		BooleanClass, TrueClass, FalseClass, NilClass,
 		NumberClass, IntClass, FltClass, CollectionClass, SequenceClass,
 		IteratorClass, sequenceIteratorClass,
-		StringClass, ArrayClass, HashClass, BufferClass,
+		StringClass, ArrayClass, HashClass, BufferClass, PairClass,
 		ErrorClass,
 	}
 	for _, x := range cs {
@@ -566,18 +565,55 @@ func (o *arrObj) init(x []*Object) *Object {
 	return (*Object)(unsafe.Pointer(o))
 }
 
-type hashObj struct {
-	Object
-	d map[interface{}] *Object
+type hashKey struct {
+	c *Class
+	v interface{}
 }
 
-func (o *hashObj) init(m map[interface{}] *Object) *Object {
+func (k hashKey) String() string {
+	return fmt.Sprint(k.v)
+}
+
+type pairKey struct {
+	this hashKey
+	next interface{}
+}
+
+func (k pairKey) String() string {
+	return fmt.Sprintf("%s:%s", k.this, k.next)
+}
+
+type hashObj struct {
+	Object
+	d map[hashKey] *Object
+}
+
+func (o *hashObj) init(m map[hashKey] *Object) *Object {
 	o.c = HashClass
 	o.d = m
 	if o.d == nil {
-		o.d = make(map[interface{}] *Object)
+		o.d = make(map[hashKey] *Object)
 	}
 	return (*Object)(unsafe.Pointer(o))
+}
+
+func keyData(o *Object) hashKey {
+	c := o.c
+	o = ObjectClass.Call(o, _Object_key)
+	var x interface{}
+	switch o.c {
+	case StringClass:
+		x = o.ToString()
+	case IntClass:
+		x = o.ToInt()
+	case FltClass:
+		x = o.ToFloat()
+	case PairClass:
+		x = pairKey{keyData(o.f[0]), keyData(o.f[1])}
+	default:
+		x = o
+	}
+	return hashKey{c, x}
 }
 
 type bufObj struct {
@@ -834,7 +870,7 @@ func initBaseClasses() {
 		PropSlot("name", func(a *Object) *Object {
 			return Wrap(a.accessorData().n)
 		}, Nil),
-		MSlot("defined", func(a, o *Object) *Object {
+		MSlot("on", func(a, o *Object) *Object {
 			return Wrap(o.Defined(a.accessorData()))
 		}),
 		MSlot("property", func(a, o *Object) *Object {
@@ -924,23 +960,6 @@ func classScanNames(c *Class, in map[string] bool, hook, deep bool) {
 	if deep && c.a != nil {
 		classScanNames(c.a, in, hook, deep)
 	}
-}
-
-func keyData(o *Object) interface{} {
-	c := o.c
-	o = ObjectClass.Call(o, _Object_key)
-	var x interface{}
-	switch o.c {
-	case StringClass:
-		x = o.ToString()
-	case IntClass:
-		x = o.ToInt()
-	case FltClass:
-		x = o.ToFloat()
-	default:
-		x = o
-	}
-	return struct{c *Class; x interface{}}{c, x}
 }
 
 func trimString(args []*Object) string {
@@ -1356,12 +1375,20 @@ func initCollectionClasses() {
 		MSlot("keys", func(o *Object) *Object {
 			res := []*Object{}
 			for k := range o.ToHash() {
-				res = append(res, Wrap(k))
+				res = append(res, Wrap(k.v))
 			}
 			return Wrap(res)
 		}),
-		MSlot("__new__", func(o *Object) *Object {
-			return new(hashObj).init(nil)
+		MSlot("__new__", func(o *Object, args []*Object) *Object {
+			h := map[hashKey] *Object{}
+			for _, x := range args {
+				if x.c != PairClass {
+					panic(TypeError(x))
+				}
+				k, v := x.f[0], x.f[1]
+				h[keyData(k)] = v
+			}
+			return new(hashObj).init(h)
 		}),
 		MSlot("__iter__", func(o *Object) *Object {
 			return sequenceIteratorClass.New(HashClass.Call(o, 0))
@@ -1608,6 +1635,22 @@ func initCollectionClasses() {
 				s = s[n:]
 			}
 			return Wrap(string(res))
+		}),
+	})
+	
+	PairClass = ObjectClass.extend("Pair", Final, []Slot {
+		PropSlot("left", func(o *Object) *Object {
+			return o.f[0]
+		}, Nil),
+		PropSlot("right", func(o *Object) *Object {
+			return o.f[1]
+		}, Nil),
+		MSlot("create", func(o, left, right *Object) *Object {
+			o.f = []*Object{left, right}
+			return Nil
+		}),
+		MSlot("toString", func(o *Object) *Object {
+			return Wrap(fmt.Sprintf("%s:%s", o.f[0], o.f[1]))
 		}),
 	})
 }
