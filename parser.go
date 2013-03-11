@@ -339,7 +339,7 @@ func parseAccExpr(p *Parser, l *Lexer, t Token) *Node {
 	if t.Kind != id {
 		panic(Expected("identifier", t))
 	}
-	return kNode(callNode).Add(tNode(varNode, "Accessor"), vNode(t.Text))
+	return &Node{Kind: accNode, Token: t}
 }
 
 func parseBuiltin(p *Parser, l *Lexer, t Token) *Node {

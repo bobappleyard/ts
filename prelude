@@ -1,3 +1,12 @@
+// The part of the standard library implemented in TranScript.
+
+def loop(f, args*)
+	def next(args*)
+		return f.apply([next] + args);
+	end;
+	return next.apply(args);
+end;
+
 def writeString(dst, s)
 	dst.writeBuffer(s.toBuffer());
 end;
@@ -5,8 +14,6 @@ end;
 def invert(f) = fn(args*)
 	return !f.apply(args);
 end;
-
-// The part of the standard library implemented in TranScript.
 
 // Iteration
 // =========
@@ -32,15 +39,14 @@ end;
 // so halting iteration.
 def for(it, f)
 	it = iter(it);
-	def step()
+	return loop(fn(step)
 		def x = it.next();
 		if x != done then
 			if f(x) != done then
 				return step();
 			end;
 		end;
-	end;
-	return step();
+	end);
 end;
 
 // Turn a function into an iterator.
@@ -127,15 +133,8 @@ end;
 def izip(its*)
 	its = map(its, iter);
 	return iter(fn()
-		def isDone = false;
-		def cur = map(its, fn(x)
-			def item = x.next();
-			if item == done then
-				isDone = true;
-			end;
-			return item;
-		end);
-		if isDone then
+		def cur = map(its, @next.call);
+		if cur.size != its.size then
 			return done;
 		end;
 		if any(cur, fn(x) = x == done) then
@@ -226,24 +225,32 @@ def split(thk, h)
 end;
 
 def switchType(x, cs*)
+	def f(x) = false;
 	for(cs, fn(c)
-		if x.is(c[0]) then
-			c[1]();
+		if x.is(c.left) then
+			f = c.right;
 			return done;
 		end;
 	end);
+	return f();
 end;
 
-// Call a function with an escape (one-shot) continuation.
+// Call a function with the ability to perform non-local escape.
 //
 // Calls f, and whatever it returns is returned by callWithCont(). f takes a
-// single parameter, a continuation object.
+// single argument, an escape.
 //
-// The continuation object is a function that takes a single argument. When
-// called, it causes callWithCont() to return the value of that argument.
+// The escape is a function that takes a single argument. When called, it causes
+// callWithCont() to return the value of that argument immediately, skipping out
+// anything that the function might do in that call.
 //
-// This is somewhat like call/cc in Scheme. However, unlike Scheme's
-// continuations, these continuations are not valid after callWithCont()
+// When control leaves the dynamic extent of the call to callWithEscape, however
+// this might occur unwind, if provided, will be called without any arguments.
+// Thus callWithEscape can be used to power context managers as well as 
+// non-local escape.
+//
+// This is somewhat like call/cc combined with dynamic-wind in Scheme. However, 
+// unlike Scheme's continuations, escapes are not valid after callWithEscape()
 // returns.
 def callWithEscape(f, unwind?)
 	def key = Object(),
@@ -252,22 +259,22 @@ def callWithEscape(f, unwind?)
 	def e = catch(fn()
 		res = f(fn(x)
 			if followed then
-				throw("stale continuation");
+				throw("stale escape");
 			end;
-			throw([key, x]);
+			throw(key:x);
 		end);
 	end);
 	followed = true;
-	// normal return
 	unwind && unwind();
+	// normal return
 	if !e then
 		return res;
 	end;
-	// followed continuation
-	if e.is(Array) && e.size == 2 && e[0] == key then
-		return e[1];
+	// followed escape
+	if e.is(Pair) && e.left == key then
+		return e.right;
 	end;
-	// error
+	// error/other escape
 	throw(e);
 end;
 

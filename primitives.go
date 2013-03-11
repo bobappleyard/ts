@@ -140,9 +140,9 @@ func Wrap(x interface{}) *Object {
 		if v == nil {
 			return Nil
 		}
-		res := make(map[hashKey] *Object)
+		res := make(map[hashKey] hashItem)
 		for k, v := range v {
-			res[keyData(k)] = v
+			res[keyData(k)] = hashItem{k, v}
 		}
 		return new(hashObj).init(res)
 	case func(*Object, []*Object) *Object:
@@ -204,10 +204,6 @@ func Wrap(x interface{}) *Object {
 		})
 	case error:
 		return Wrap(v.Error())
-	case hashKey:
-		return Wrap(v.v)
-	case pairKey:
-		return PairClass.New(Wrap(v.this), Wrap(v.next))
 	}
 	v := reflect.ValueOf(x)
 	if v.Kind() == reflect.Array {
@@ -279,11 +275,6 @@ func (o *Object) ToArray() []*Object {
 func (o *Object) ToClass() *Class {
 	o.checkClass(o.c == ClassClass)
 	return (*clsObj)(unsafe.Pointer(o)).d
-}
-
-func (o *Object) ToHash() map[hashKey] *Object {
-	o.checkClass(o.c == HashClass)
-	return (*hashObj)(unsafe.Pointer(o)).d
 }
 
 func (o *Object) ToBuffer() []byte {
@@ -392,7 +383,7 @@ func (i *Interpreter) LoadPrimitives() {
 			if nm == "" {
 				panic(fmt.Errorf("bad name"))
 			}
-			res := new(accObj).init(i.Accessor(nm))
+			res := i.Accessor(nm).o
 			res.c = accClass
 			return res
 		}),
@@ -570,8 +561,8 @@ type hashKey struct {
 	v interface{}
 }
 
-func (k hashKey) String() string {
-	return fmt.Sprint(k.v)
+type hashItem struct {
+	key, val *Object
 }
 
 type pairKey struct {
@@ -579,22 +570,23 @@ type pairKey struct {
 	next interface{}
 }
 
-func (k pairKey) String() string {
-	return fmt.Sprintf("%s:%s", k.this, k.next)
-}
-
 type hashObj struct {
 	Object
-	d map[hashKey] *Object
+	d map[hashKey] hashItem
 }
 
-func (o *hashObj) init(m map[hashKey] *Object) *Object {
+func (o *hashObj) init(m map[hashKey] hashItem) *Object {
 	o.c = HashClass
 	o.d = m
 	if o.d == nil {
-		o.d = make(map[hashKey] *Object)
+		o.d = make(map[hashKey] hashItem)
 	}
 	return (*Object)(unsafe.Pointer(o))
+}
+
+func (o *Object) hashData() map[hashKey] hashItem {
+	o.checkClass(o.c == HashClass)
+	return (*hashObj)(unsafe.Pointer(o)).d
 }
 
 func keyData(o *Object) hashKey {
@@ -834,7 +826,7 @@ func initBaseClasses() {
 		PropSlot("ancestor", func(o *Object) *Object {
 			return o.ToClass().a.o
 		}, Nil),
-		MSlot("slotNames", func(o *Object, flags []*Object) *Object {
+		MSlot("instanceSlots", func(o *Object, flags []*Object) *Object {
 			c := o.ToClass()
 			return Wrap(c.Names(parseNamesFlags(flags)))
 		}),
@@ -899,6 +891,14 @@ func initBaseClasses() {
 			o := args[0]
 			args = args[1:]
 			return o.Call(a.accessorData(), args...)
+		}),
+		MSlot("is", func(o, c *Object) *Object {
+			oc := o.Class()
+			cc := c.ToClass()
+			if cc.Is(AccessorClass) && oc.Is(AccessorClass) {
+				return True
+			}
+			return Wrap(oc.Is(cc))
 		}),
 		MSlot("info", func(o *Object) *Object {
 			a := o.accessorData()
@@ -981,12 +981,12 @@ func initSimpleClasses() {
 		}),
 	})
 	
-	TrueClass = BooleanClass.extend("True", 0, []Slot {
+	TrueClass = BooleanClass.extend("", 0, []Slot {
 		MSlot("toString", func(o *Object) *Object {
 			return Wrap("true")
 		}),
 	})
-	FalseClass = BooleanClass.extend("False", 0, []Slot {
+	FalseClass = BooleanClass.extend("", 0, []Slot {
 		MSlot("toString", func(o *Object) *Object {
 			return Wrap("false")
 		}),
@@ -1374,19 +1374,19 @@ func initCollectionClasses() {
 	HashClass = CollectionClass.extend("Hash", Final, []Slot {
 		MSlot("keys", func(o *Object) *Object {
 			res := []*Object{}
-			for k := range o.ToHash() {
-				res = append(res, Wrap(k.v))
+			for _, v := range o.hashData() {
+				res = append(res, Wrap(v.key))
 			}
 			return Wrap(res)
 		}),
 		MSlot("__new__", func(o *Object, args []*Object) *Object {
-			h := map[hashKey] *Object{}
+			h := map[hashKey] hashItem{}
 			for _, x := range args {
 				if x.c != PairClass {
 					panic(TypeError(x))
 				}
 				k, v := x.f[0], x.f[1]
-				h[keyData(k)] = v
+				h[keyData(k)] = hashItem{k, v}
 			}
 			return new(hashObj).init(h)
 		}),
@@ -1396,32 +1396,32 @@ func initCollectionClasses() {
 		MSlot("toString", func(o *Object) *Object {
 			res := "{"
 			start := true
-			for k, v := range o.ToHash() {
+			for _, v := range o.hashData() {
 				if !start {
 					res += ", "
 				}
 				start = false
-				res += fmt.Sprintf("%v: %v", k, v)
+				res += fmt.Sprintf("%v: %v", v.key, v.val)
 			}
 			res += "}"
 			return Wrap(res)
 		}),
 		MSlot("__aget__", func(o, k *Object) *Object {
-			res := o.ToHash()[keyData(k)]
-			if res == nil {
+			res, ok := o.hashData()[keyData(k)]
+			if !ok {
 				panic(fmt.Errorf("missing value: %s", k))
 			}
-			return res
+			return res.val
 		}),
 		MSlot("__aset__", func(o, k, v *Object) *Object {
-			o.ToHash()[keyData(k)] = v
+			o.hashData()[keyData(k)] = hashItem{k, v}
 			return Nil
 		}),
 		PropSlot("size", func(o *Object) *Object {
-			return Wrap(len(o.ToHash()))
+			return Wrap(len(o.hashData()))
 		}, Nil),
 		MSlot("contains", func(o, k *Object) *Object {
-			_, ok := o.ToHash()[keyData(k)]
+			_, ok := o.hashData()[keyData(k)]
 			return Wrap(ok)
 		}),
 	})

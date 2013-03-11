@@ -55,6 +55,7 @@ func NewScanner(in io.Reader, f string) *Lexer {
 const (
 	invalidNode = iota
 	valNode
+	accNode
 	// variables and operators
 	defNode
 	varNode
@@ -80,6 +81,7 @@ const (
 var nodeNames = []string {
 	"?",
 	"val",
+	"acc",
 	"def",
 	"var",
 	"mut",
@@ -165,6 +167,8 @@ func (u *Unit) compileNode(n *Node, e compilerCtx) {
 		u.compileVar(n, e)
 	case valNode:
 		u.compileVal(n, e)
+	case accNode:
+		u.compileAcc(n, e)
 	case mutNode:
 		u.compileMutation(n, e)
 	case ifNode:
@@ -444,6 +448,10 @@ func (u *Unit) compileVar(n *Node, e compilerCtx) {
 	}
 }
 
+func (u *Unit) compileAcc(n *Node, e compilerCtx) {
+	e.write(ACCESSOR, u.getAccessor(n.Token.Text))
+}
+
 func (u *Unit) compileMutation(n *Node, e compilerCtx) {
 	switch n.Child[0].Kind {
 	case alookNode:
@@ -514,23 +522,7 @@ func (u *Unit) compileFn(n *Node, e compilerCtx) {
 	free := nodeStrs(freeNodes)
 	boxed := boxedVars(body, bound, e)
 	f := compilerCtx{bound, free, boxed, e.class, new([]uint16), 0}
-	// emit function prologue
-	var desc fdesc
-	if args.Data != nil {
-		desc = args.Data.(fdesc)
-	}
-	if desc.rest {
-		f.write(PROLOG_REST, len(bound)-desc.opt-1, len(bound)-1)
-	} else if desc.opt != 0 {
-		f.write(PROLOG_OPT, len(bound)-desc.opt, len(bound))
-	} else {
-		f.write(PROLOG, len(bound))
-	}
-	for i, x := range bound {
-		if f.isBoxed(x) {
-			f.write(BOX, i)
-		}
-	}
+	u.compileProlog(args, f)
 	if len(body) != 0 {
 		u.writeSrc(body[0], f)
 	}
@@ -547,6 +539,26 @@ func (u *Unit) compileFn(n *Node, e compilerCtx) {
 		e.write(PUSH)
 	}
 	e.write(CLOSE, ix, len(free))
+}
+
+func (u *Unit) compileProlog(args *Node, f compilerCtx) {
+	var desc fdesc
+	if args.Data != nil {
+		desc = args.Data.(fdesc)
+	}
+	l := len(args.Child)
+	if desc.rest {
+		f.write(PROLOG_REST, l-desc.opt-1, l-1)
+	} else if desc.opt != 0 {
+		f.write(PROLOG_OPT, l-desc.opt, l)
+	} else {
+		f.write(PROLOG, l)
+	}
+	for i, x := range nodeStrs(args.Child) {
+		if f.isBoxed(x) {
+			f.write(BOX, i)
+		}
+	}
 }
 
 func (u *Unit) compileBlock(n []*Node, e compilerCtx) {

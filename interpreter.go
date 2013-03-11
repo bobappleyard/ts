@@ -52,6 +52,7 @@ const (
 type Accessor struct {
 	n string
 	e []Slot
+	o *Object
 }
 
 type SlotKind byte
@@ -698,6 +699,7 @@ func (i *Interpreter) Accessor(n string) *Accessor {
 	a := i.a[n]
 	if a == nil {
 		a = &Accessor{n: n}
+		a.o = new(accObj).init(a)
 		i.a[n] = a
 	}
 	return a
@@ -964,6 +966,10 @@ func (p *process) step() {
 	case VALUE:
 		n := p.next()
 		p.v = p.u.v[n]
+	
+	case ACCESSOR:
+		n := p.next()
+		p.v = p.u.a[n].o
 		
 	case BOUND:
 		n := p.next()
