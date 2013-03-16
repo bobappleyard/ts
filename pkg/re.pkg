@@ -1,0 +1,135 @@
+package re
+
+	export compile, match, all, split, replace, fullSplit;
+
+	def compile(expr) = Regex(expr);
+	def match(expr, inp) = compile(expr).match(inp);
+	def all(expr, inp) = compile(expr).all(inp);
+	def split(expr, inp) = compile(expr).split(inp);
+	def replace(expr, with, inp) = compile(expr).replace(with, inp);
+	def fullSplit(expr, inp) = compile(expr).fullSplit(inp);
+
+	def ext = loadExtension("re");
+
+	class Match(record(@start, @size, @text)) 
+		def toString() = this.text;
+	end;
+	
+	
+
+	// A wrapper around the Go library.
+	class Regex()
+		def create(expr)
+			this.prog = ext.Regex(expr);
+			this.expr = expr;
+		end;
+		def match(inp)
+			inp = wrap(inp);
+			def last = inp.pos;
+			def ma = this.prog.match(inp);
+			if ma.size == 0 then
+				return false;
+			end;
+			return map(isegment(2, ma), fn(m)
+				if m[0] == -1 then
+					return false;
+				end;
+				def start = last + m[0],
+				    stop = last + m[1],
+				    text = inp.buf.slice(start, stop).join();
+				return Match(start, stop-start, text);
+			end);
+		end;
+		def all(inp) = slurp(this.iall(inp));
+		def iall(inp)
+			inp = wrap(inp);
+			return FnIterator(fn()
+				def m = this.match(inp);
+				if m then
+					inp.pos = m[0].start + m[0].size;
+					return m;
+				end;
+				return done;
+			end);
+		end;
+		def replace(with, inp)
+			if with.is(String) then
+				def s = with;
+				with = fn(m) = s;
+			end;
+			def s = this.fullSplit(inp);
+			def res = "", i = 0;
+			def step()
+				if i >= s.size then
+					return res;
+				end;
+				res = res + s[i];
+				i = i + 1;
+				if i >= s.size then
+					return res;
+				end;
+				res = res + with(s[i]);
+				i = i + 1;
+				return step();
+			end;
+			return step();
+		end;
+		def split(inp)
+			def s = this.fullSplit(inp);
+			def res = [];
+			for(ifilter(range(s.size), fn(i) = i.modulo(2) == 0), fn(i)
+				res.add(s[i]);
+			end);
+			return res;
+		end;
+		def fullSplit(inp)
+			inp = wrap(inp);
+			def res = [];
+			def pos = inp.pos;
+			for(this.iall(inp), fn(m)
+				res.add(inp.buf.slice(pos, m[0].start).join());
+				res.add(m[0].text);
+				pos = m[0].start + m[0].size;
+			end);
+			inp.pos = pos;
+			res.add(inp.remaining());
+			return res;
+		end;
+	private
+		def prog, expr;
+	end;
+	
+	def wrap(inp)
+		if inp.is(InputReader) then
+			return inp;
+		end;
+		return InputReader(inp);
+	end;
+	
+	// Extension API wants an object of this shape.
+	class InputReader()
+		def create(src)
+			this.src = src.__iter__();
+			this.buf = [];
+		end;
+		def readChar()
+			if this.pos >= this.buf.size then
+				def more = this.src.next();
+				if more == done then
+					return done;
+				end;
+				this.buf.add.apply(more.split());
+			end;
+			def c = this.buf[this.pos];
+			this.pos = this.pos + 1;
+			return c;
+		end;
+		def remaining()
+			def pos = this.pos;
+			repeat(this.readChar);
+			return this.buf.slice(pos).join();
+		end;
+		def pos = 0, buf, src;
+	end;
+	
+end;

@@ -7,12 +7,20 @@ def loop(f, args*)
 	return next.apply(args);
 end;
 
+def identity(x) = x;
+
 def writeString(dst, s)
 	dst.writeBuffer(s.toBuffer());
 end;
 
 def invert(f) = fn(args*)
 	return !f.apply(args);
+end;
+
+def repeat(f)
+	if f() != done then
+		return repeat(f);
+	end;
 end;
 
 // Iteration
@@ -73,7 +81,7 @@ def imap(it, f)
 	end);
 end;
 
-def ireduce(it, acc, f)
+def reduce(it, acc, f)
 	for(it, fn(x)
 		acc = f(x, acc);
 	end);
@@ -151,8 +159,46 @@ def slurp(it)
 	return res;
 end;
 
+class NotEnoughItems(Error)
+	def create()
+		super.create("not enough items");
+	end;
+end;
+
+// Put the first n items of an iterator into an array. Throws an error if there
+// aren't enough items.
+def take(n, it)
+	it = it.__iter__();
+	def res = [];
+	for(range(n), fn(x)
+		def cur = it.next();
+		if cur == done then
+			throw(NotEnoughItems());
+		end;
+		res.add(cur);
+	end);
+	return res;
+end;
+
+// Run take() over an iterator.
+def isegment(n, it)
+	it = it.__iter__();
+	return FnIterator(fn()
+		def res;
+		def e = catch(fn() 
+			res = take(n, it);
+		end);
+		if e.is(NotEnoughItems) then
+			return done;
+		end;
+		if e then
+			throw(e);
+		end;
+		return res;
+	end);
+end;
+
 def map(it, f) = slurp(imap(it, f));
-def reduce(it, f) = slurp(ireduce(it, f));
 def filter(it, f) = slurp(ifilter(it, f));
 def append(its*) = slurp(iappend.apply(its));
 def zip(its*) = slurp(izip.apply(its));

@@ -1,0 +1,150 @@
+package parse
+
+	export Lexer, Token, Parser;
+
+	import re;
+	
+	class ParseError(Error)
+	end;
+	
+	class NoTokenMatched(ParseError)
+		def create()
+			super.create("no token matched");
+		end;
+	end;
+	
+	class UnexpectedToken(ParseError)
+		def create(t)
+			super.create("unexpected " + t.text);
+		end;
+	end;
+	
+	class Token(record(@id, @text))
+	end;
+
+	class Lexer()
+		def create(lexicon*)
+			def expr = map(lexicon + ["."], this.prepare).join("|");
+			this.prog = re.compile(expr);
+		end;
+		def scan(inp) = imap(this.prog.iall(inp), fn(m)
+			def sm = find(m.slice(1), identity);
+			def idx = m.indexOf(sm);
+			if idx == m.size - 1 then
+				throw(NoTokenMatched());
+			end;
+			return Token(idx-1, sm.text);
+		end);
+	private
+		def prog;
+		def prepare(sub)
+			def res = "";
+			def ma = re.fullSplit("(\\\\\\\\)*\\\\\\(", sub);
+			for(range(ma.size), fn(i)
+				if i.modulo(2) == 0 then
+					res = res + re.replace("\\(", "(?:", ma[i]);
+				else
+					res = res + ma[i];
+				end;
+			end);
+			return "(" + res + ")";
+		end;
+	end;
+	
+	class LL1()
+		def create(src)
+			this.src = src;
+			this.cache = done;
+		end;
+		def __iter__()
+			return this;
+		end;
+		def next()
+			if this.cache != done then
+				def res = this.cache;
+				this.cache = done;
+				return res;
+			end;
+			return this.src.next();
+		end;
+		def peek()
+			this.cache = this.next();
+			return this.cache;
+		end;
+	private
+		def src, cache;
+	end;
+	
+	class Parser()
+		def create()
+			this.prefix = {};
+			this.infix = {};
+		end;
+		def parse(lex, prec)
+			if !(@peek.defined(lex)) then
+				lex = LL1(lex);
+			end;
+			def t = lex.next();
+			def prefix = this.getFrom(this.prefix, t);
+			if !prefix then
+				throw(Unexpected(t));
+			end;
+			def res = prefix(this, lex, t);
+			repeat(fn()
+				t = lex.peek();
+				def infix = this.getFrom(this.infix, t);
+				if !infix || infix.precedence(t) <= prec then
+					return done;
+				end;
+				lex.next();
+				res = infix.parseInfix(this, lex, res, t);
+			end);
+			return res;
+		end;
+		def add(id, str, parser)
+			this.prefix[Key(id, str)] = parser;
+		end;
+		def addInfix(id, str, parser)
+			this.infix[Key(id, str)] = parser;
+		end;
+	private
+		def prefix, infix;
+		def getFrom(a, t)
+			def k = Key(t.id, t.test);
+			if a.contains(k) then
+				return a[k];
+			end;
+			k = Key(t.id, false);
+			if a.contains(k) then
+				return a[k];
+			end;
+			return false;
+		end;
+	end;
+	
+	class Operator()
+		def create(prec, f)
+			this.prec = prec;
+			this.f = f;
+		end;
+		def precedence(t) = this.prec;
+		def apply(left, right) = this.f(left, right);
+	private
+		def prec, f;
+	end;
+	
+	class LeftOp(Operator)
+		def parseInfix(parser, lexer, left, t)
+			def right = parser.parse(lexer, this.precedence(t));
+			return this.apply(left, right);
+		end;
+	end;
+	
+	class RightOp(Operator)
+		def parseInfix(parser, lexer, left, t)
+			def right = parser.parse(lexer, this.precedence(t)-1);
+			return this.apply(left, right);
+		end;
+	end;
+
+end;
