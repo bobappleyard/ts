@@ -99,7 +99,7 @@ type Unit struct {
 	a []*Accessor
 	gn, an []string
 	b [][]uint16
-	file string
+	path, file string
 	line int
 }
 
@@ -178,6 +178,7 @@ func (i *Interpreter) Eval(s string) *Object {
 // Panics on error.
 func (i *Interpreter) Load(p string) {
 	u := new(Unit)
+	u.path = p
 	f, err := os.Open(p)
 	if err != nil {
 		panic(err)

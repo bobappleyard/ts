@@ -390,6 +390,16 @@ func (i *Interpreter) LoadPrimitives() {
 	})
 	i.Define("Accessor", accClass.o)
 	
+	i.Define("currentSourceFile", new(funcObj).init(func(p *process) {
+		p.b = len(p.s) - p.n
+		p.ret(Wrap(p.u.file))
+	}))
+	
+	i.Define("currentLoadFile", new(funcObj).init(func(p *process) {
+		p.b = len(p.s) - p.n
+		p.ret(Wrap(p.u.path))
+	}))
+	
 	i.Define("load", Wrap(func(o, p *Object) *Object {
 		i.Load(p.ToString())
 		return Nil
@@ -438,7 +448,7 @@ func (i *Interpreter) LoadPrimitives() {
 			if e := recover(); e != nil {
 				p.ret(p.wrapError(e))
 			}
-		}()
+		}()/**/
 		var thk *Object
 		p.b = len(p.s) - p.n
 		p.parseArgs(&thk)

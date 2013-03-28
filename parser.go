@@ -679,7 +679,7 @@ func parseIf(p *Parser, l *Lexer, t Token) *Node {
 func parsePkg(l *Lexer) *Node {
 	n := new(Node)
 	en := new(Node)
-	n.Add(parseDotted(l), en)
+	n.Add(parseName(l), en)
 	loop: for {
 		switch l.Lookahead().Text {
 		case "export":
@@ -702,8 +702,8 @@ func parsePkg(l *Lexer) *Node {
 
 func transPkg(n *Node) *Node {
 	// the package location
-	nm, loc := transDotted(n.Child[0])
-	pl := kNode(alookNode).Add(tNode(varNode, "packages"), vNode(loc))
+	nm := n.Child[0].Token.Text
+	ctx := kNode(callNode).Add(tNode(varNode, "currentLoadFile"))
 	// export as instance of class
 	ds := kNode(defNode)
 	pc := kNode(classNode).Add(
@@ -722,7 +722,8 @@ func transPkg(n *Node) *Node {
 	fn := kNode(fnNode).Add(new(Node))
 	fn.Add(n.Child[2:]...)
 	fn.Add(kNode(retNode).Add(kNode(callNode).Add(pc)))
-	return kNode(mutNode).Add(pl, kNode(callNode).Add(fn))
+	pl := tNode(lookNode, "__register__").Add(tNode(varNode, "packages"))
+	return kNode(callNode).Add(pl, vNode(nm), ctx, kNode(callNode).Add(fn))
 }
 
 func parseDotted(l *Lexer) *Node {

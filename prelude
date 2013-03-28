@@ -362,6 +362,19 @@ def packages = class()
 	def __aset__(nm, p)
 		this.pkgs[nm] = p;
 	end;
+	def __register__(nm, ctx, pkg)
+		for(this.packagePaths, fn(path)
+			if ctx.startsWith(path) then
+				def l = (nm + ".pkg").size;
+				def b = ctx.split().slice(path.size, ctx.size - l).join();
+				b = b.trim("/").replace("/", ".");
+				if b != "" then
+					b = b + ".";
+				end;
+				this.pkgs[b + nm] = pkg;
+			end;
+		end);
+	end;
 private
 	def pkgs = {};
 end();
