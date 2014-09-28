@@ -248,48 +248,46 @@ func AbstractMethod(n string) Slot {
 // Retrieve int associated with the object. Panics if there is no such datum.
 func (o *Object) ToInt() int64 {
 	o.checkClass(o.c == IntClass)
-	return (*intObj)(unsafe.Pointer(o)).d
+	return o.data.(int64)
 }
 
 // Retrieve float64 associated with the object. Panics if there is no such
 // datum.
 func (o *Object) ToFloat() float64 {
 	o.checkClass(o.c == FltClass)
-	return (*fltObj)(unsafe.Pointer(o)).d
+	return o.data.(float64)
 }
 
 // Retrieve string associated with the object. Panics if there is no such datum.
 func (o *Object) ToString() string {
 	o.checkClass(o.c == StringClass)
-	return (*strObj)(unsafe.Pointer(o)).d
+	return o.data.(string)
 }
 
 // Retrieve []*Object associated with the object. Panics if there is no such 
 // datum.
 func (o *Object) ToArray() []*Object {
 	o.checkClass(o.c == ArrayClass)
-	return (*arrObj)(unsafe.Pointer(o)).d
+	return o.data.([]*Object)
 }
 
 // Retrieve *Class associated with the object. Panics if there is no such datum.
 func (o *Object) ToClass() *Class {
 	o.checkClass(o.c == ClassClass)
-	return (*clsObj)(unsafe.Pointer(o)).d
+	return o.data.(*Class)
 }
 
 func (o *Object) ToBuffer() []byte {
 	o.checkClass(o.c == BufferClass)
-	return (*bufObj)(unsafe.Pointer(o)).d
+	return o.data.([]byte)
 }
 
 func (o *Object) UserData() interface{} {
-	o.checkClass(o.c.flags & UserData != 0)
-	return (*userObj)(unsafe.Pointer(o)).d
+	return o.data
 }
 
 func (o *Object) SetUserData(x interface{}) {
-	o.checkClass(o.c.flags & UserData != 0)
-	(*userObj)(unsafe.Pointer(o)).d = x
+	o.data = x
 }
 
 var extensions = map[string] func(*Interpreter) map[string] *Object{}
@@ -487,45 +485,30 @@ func (o *Object) checkClass(pass bool) {
 	}
 }
 
-type userObj struct {
-	Object
-	d interface{}
-}
-
-func (o *userObj) init(c *Class, f []*Object) *Object {
-	o.c = c
-	o.f = f
-	return (*Object)(unsafe.Pointer(o))
-}
-
-type funcObj struct {
-	Object
-	d func(*process)
-}
+type funcObj struct {}
 
 func (o *Object) funcData() func(*process) {
 	if o.c == FunctionClass {
-		return (*funcObj)(unsafe.Pointer(o)).d
+		return o.data.(func(*process))
 	}
 	return o.bindMethod(o.c.m[_Object_call]).funcData()
 }
 
-func (o *funcObj) init(x func(*process)) *Object {
+func (dd *funcObj) init(x func(*process)) *Object {
+	o := new(Object)
 	o.c = FunctionClass
 	o.f = []*Object{False}
-	o.d = x
-	return (*Object)(unsafe.Pointer(o))
+	o.data = x
+	return o
 }
 
-type intObj struct {
-	Object
-	d int64
-}
+type intObj struct {}
 
-func (o *intObj) init(x int64) *Object {
+func (dd *intObj) init(x int64) *Object {
+	o := new(Object)
 	o.c = IntClass
-	o.d = x
-	return (*Object)(unsafe.Pointer(o))
+	o.data = x
+	return o
 }
 
 type fltObj struct {
@@ -533,9 +516,10 @@ type fltObj struct {
 	d float64
 }
 
-func (o *fltObj) init(x float64) *Object {
+func (dd *fltObj) init(x float64) *Object {
+	o := new(Object)
 	o.c = FltClass
-	o.d = x
+	o.data = x
 	return (*Object)(unsafe.Pointer(o))
 }
 
@@ -544,9 +528,10 @@ type strObj struct {
 	d string
 }
 
-func (o *strObj) init(x string) *Object {
+func (dd *strObj) init(x string) *Object {
+	o := new(Object)
 	o.c = StringClass
-	o.d = x
+	o.data = x
 	return (*Object)(unsafe.Pointer(o))
 }
 
@@ -557,13 +542,14 @@ type arrObj struct {
 
 func (o *Object) setArray(x []*Object) {
 	o.checkClass(o.c == ArrayClass)
-	(*arrObj)(unsafe.Pointer(o)).d = x
+	o.data = x
 }
 
-func (o *arrObj) init(x []*Object) *Object {
+func (dd *arrObj) init(x []*Object) *Object {
+	o := new(Object)
 	o.c = ArrayClass
-	o.d = x
-	return (*Object)(unsafe.Pointer(o))
+	o.data = x
+	return o
 }
 
 type hashKey struct {
@@ -580,23 +566,21 @@ type pairKey struct {
 	next interface{}
 }
 
-type hashObj struct {
-	Object
-	d map[hashKey] hashItem
-}
+type hashObj struct {}
 
-func (o *hashObj) init(m map[hashKey] hashItem) *Object {
+func (dd *hashObj) init(m map[hashKey] hashItem) *Object {
+	o := new(Object)
 	o.c = HashClass
-	o.d = m
-	if o.d == nil {
-		o.d = make(map[hashKey] hashItem)
+	o.data = m
+	if o.data == nil {
+		o.data = make(map[hashKey] hashItem)
 	}
-	return (*Object)(unsafe.Pointer(o))
+	return o
 }
 
 func (o *Object) hashData() map[hashKey] hashItem {
 	o.checkClass(o.c == HashClass)
-	return (*hashObj)(unsafe.Pointer(o)).d
+	return o.data.(map[hashKey] hashItem)
 }
 
 func keyData(o *Object) hashKey {
@@ -618,80 +602,70 @@ func keyData(o *Object) hashKey {
 	return hashKey{c, x}
 }
 
-type bufObj struct {
-	Object
-	d []byte
-}
+type bufObj struct {}
 
-func (o *bufObj) init(x []byte) *Object {
+func (dd *bufObj) init(x []byte) *Object {
+	o := new(Object)
 	o.c = BufferClass
-	o.d = x
-	return (*Object)(unsafe.Pointer(o))
+	o.data = x
+	return o
 }
 
-type skelObj struct {
-	Object
-	d []Slot
-}
+type skelObj struct {}
 
 func (o *Object) skelData() []Slot {
 	o.checkClass(o.c == skeletonClass)
-	return (*skelObj)(unsafe.Pointer(o)).d
+	return o.data.([]Slot)
 }
 
-func (o *skelObj) init(x []Slot) *Object {
+func (dd *skelObj) init(x []Slot) *Object {
+	o := new(Object)
 	o.c = skeletonClass
-	o.d = x
-	return (*Object)(unsafe.Pointer(o))
+	o.data = x
+	return o
 }
 
-type clsObj struct {
-	Object
-	d *Class
-}
+type clsObj struct {}
 
-func (o *clsObj) init(x *Class) *Object {
+func (dd *clsObj) init(x *Class) *Object {
+	o := new(Object)
 	o.c = ClassClass
 	o.f = []*Object{False}
-	o.d = x
-	return (*Object)(unsafe.Pointer(o))
+	o.data = x
+	return o
 }
 
-type boxObj struct {
-	Object
-	d *Object
-}
+type boxObj struct {}
 
 func (o *Object) boxData() *Object {
 	o.checkClass(o.c == boxClass || o.c == undefinedClass)
-	return (*boxObj)(unsafe.Pointer(o)).d
+	return o.data.(*Object)
 }
 
 func (o *Object) setBoxData(x *Object) {
 	o.checkClass(o.c == boxClass)
-	(*boxObj)(unsafe.Pointer(o)).d = x
+	o.data = x
 }
 
-func (o *boxObj) init(x *Object) *Object {
+func (dd *boxObj) init(x *Object) *Object {
+	o := new(Object)
 	o.c = boxClass
-	o.d = x
-	return (*Object)(unsafe.Pointer(o))
+	o.data = x
+	return o
 }
 
-type accObj struct {
-	Object
-	d *Accessor
-}
+type accObj struct {}
 
 func (o *Object) accessorData() *Accessor {
 	o.checkClass(o.c.Is(AccessorClass))
-	return (*accObj)(unsafe.Pointer(o)).d
+	return o.data.(*Accessor)
 }
 
-func (o *accObj) init(x *Accessor) *Object {
+func (dd *accObj) init(x *Accessor) *Object {
+	o := new(Object)
 	o.c = AccessorClass
-	o.d = x
-	return (*Object)(unsafe.Pointer(o))
+	o.data = x
+	return o
 }
 
 /*******************************************************************************
@@ -721,23 +695,23 @@ func initBaseClasses() {
 	ObjectClass.o = new(clsObj).init(ObjectClass)
 
 	boxClass = &Class{
-		flags: Final|Primitive,
+		flags: Final|Abstract,
 		n: "Box",
 		a: ObjectClass,
 	}
 	undefinedClass = &Class{
-		flags: Final|Primitive,
+		flags: Final|Abstract,
 		n: "Undefined",
 		a: ObjectClass,
 	}
 	skeletonClass = &Class{
-		flags: Final|Primitive,
+		flags: Final|Abstract,
 		n: "Skeleton",
 		a: ObjectClass,
 	}
 
 	FunctionClass = &Class{
-		flags: Final|Primitive,
+		flags: Final|Abstract,
 		n: "Function",
 		a: ObjectClass,
 	}
@@ -791,7 +765,7 @@ func initBaseClasses() {
 		MSlot("copy", func(o *Object) *Object {
 			f := make([]*Object, len(o.f))
 			copy(f, o.f)
-			return &Object{o.c, f}
+			return &Object{o.c, f, nil}
 		}),
 		MSlot("apply", func(o, args *Object) *Object {
 			return o.Call(nil, args.ToArray()...)
@@ -812,7 +786,7 @@ func initBaseClasses() {
 		}),
 	}
 	
-	NilClass = ObjectClass.extend("Nil", Final|Primitive, []Slot {
+	NilClass = ObjectClass.extend("Nil", Final|Abstract, []Slot {
 		MSlot("copy", func(o *Object) *Object {
 			return o;
 		}),
@@ -826,6 +800,9 @@ func initBaseClasses() {
 		FSlot("help", False),
 		MSlot("__call__", func(o *Object, args []*Object) *Object {
 			return o.ToClass().New(args...)
+		}),
+		MSlot("inheritsFrom", func(o, c *Object) *Object {
+			return Wrap(o.ToClass().Is(c.ToClass()))
 		}),
 		MSlot("copy", func(o *Object) *Object {
 			return o;
@@ -863,9 +840,9 @@ func initBaseClasses() {
 			return Nil
 		}),
 	}
-	ClassClass.flags = Final|Primitive
+	ClassClass.flags = Final|Abstract
 	
-	AccessorClass = ObjectClass.extend("Accessor", Primitive, []Slot {
+	AccessorClass = ObjectClass.extend("Accessor", Abstract, []Slot {
 		MSlot("copy", func(o *Object) *Object {
 			return o;
 		}),
@@ -1006,9 +983,9 @@ func initSimpleClasses() {
 	})
 	True = &Object{c: TrueClass}
 	False = &Object{c: FalseClass}
-	BooleanClass.flags = Final|Primitive
-	TrueClass.flags = Final|Primitive
-	FalseClass.flags = Final|Primitive
+	BooleanClass.flags = Final|Abstract
+	TrueClass.flags = Final|Abstract
+	FalseClass.flags = Final|Abstract
 }
 
 func numG(fi func(a, b int64) *Object,
@@ -1115,7 +1092,7 @@ func initNumberClasses() {
 		})),
 	})
 
-	IntClass = NumberClass.extend("Integer", Final|Primitive, []Slot {
+	IntClass = NumberClass.extend("Integer", Final|Abstract, []Slot {
 		MSlot("toString", func(o *Object) *Object {
 			return Wrap(fmt.Sprint(o.ToInt()))
 		}),
@@ -1139,7 +1116,7 @@ func initNumberClasses() {
 		}),
 	})
 	
-	FltClass = NumberClass.extend("Float", Final|Primitive, []Slot {
+	FltClass = NumberClass.extend("Float", Final|Abstract, []Slot {
 		MSlot("toString", func(o *Object) *Object {
 			return Wrap(fmt.Sprint(o.ToFloat()))
 		}),
@@ -1154,7 +1131,7 @@ func initNumberClasses() {
 		}),	
 	})
 	
-	NumberClass.flags = Final|Primitive
+	NumberClass.flags = Final|Abstract
 }
 
 func setOp(a, b []*Object, op int) (ina, inb, inboth []*Object) {
@@ -1196,20 +1173,20 @@ func initCollectionClasses() {
 		}),
 	})
 	
-	CollectionClass = ObjectClass.extend("Collection", Primitive, []Slot {
+	CollectionClass = ObjectClass.extend("Collection", Abstract, []Slot {
 		AbstractMethod("__aget__"),
 		AbstractMethod("__aset__"),
 		AbstractMethod("__iter__"),
 		PropSlot("size", Nil, Nil),		
 	})
-	IteratorClass = ObjectClass.extend("Iterator", Primitive, []Slot {
+	IteratorClass = ObjectClass.extend("Iterator", Abstract, []Slot {
 		AbstractMethod("next"),
 		MSlot("__iter__", func(o *Object) *Object {
 			return o
 		}),
 	})
 	
-	SequenceClass = CollectionClass.extend("Sequence", Primitive, []Slot {
+	SequenceClass = CollectionClass.extend("Sequence", Abstract, []Slot {
 		MSlot("__iter__", func(o *Object) *Object {
 			return sequenceIteratorClass.New(o)
 		}),
@@ -1483,7 +1460,7 @@ func initCollectionClasses() {
 		}),
 	})
 
-	StringClass = SequenceClass.extend("String", Final|Primitive, []Slot {
+	StringClass = SequenceClass.extend("String", Final|Abstract, []Slot {
 		MSlot("copy", func(o *Object) *Object {
 			return o;
 		}),

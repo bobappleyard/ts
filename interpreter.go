@@ -27,6 +27,7 @@ import (
 type Object struct {
 	c *Class
 	f []*Object
+	data interface{}
 }
 
 // Classes describe objects. They each have a name and an ancestor, accompanied
@@ -43,7 +44,7 @@ type Class struct {
 
 const (
 	Final = 1 << iota
-	Primitive
+	Abstract
 	UserData
 	Anon
 )
@@ -660,14 +661,11 @@ func (u *Unit) addSlot(c *Class, e *Slot) {
 
 // create a new uninitialised object
 func (c *Class) alloc() *Object {
-	if c.flags & Primitive != 0 {
-		panic(fmt.Errorf("class is primitive: %s", c.n))
+	if c.flags & Abstract != 0 {
+		panic(fmt.Errorf("class is abstract: %s", c.n))
 	}
 	f := make([]*Object, len(c.f))
 	copy(f, c.f)
-	if c.flags & UserData != 0 {
-		return new(userObj).init(c, f)
-	}
 	return &Object{c: c, f: f}
 }
 
